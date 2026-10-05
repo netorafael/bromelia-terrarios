@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-brand-bg: #FEF7F1;
+  --color-brand-surface: #FDF1EE;
+  --color-brand-card: #FFFFFF;
+  --color-brand-pink-light: #FDE0E2;
+  --color-brand-pink-mid: #FCD3D9;
+  --color-brand-pink-soft: #F9E8EC;
+  --color-brand-pink-deep: #E28B9B;
+  --color-brand-pink-action: #D66D81;
+  --color-brand-border: rgba(252, 211, 217, 0.4);
+  --color-brand-text: #1C1C1E;
+  --color-brand-text-muted: #6B6B6E;
+  --color-brand-text-subtle: #A0A0A3;
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: #FEF7F1;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  color: #1C1C1E;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  --app-bg: #FEF7F1;
+  --app-surface: #FFFFFF;
+  --app-text: #1C1C1E;
+}
+
+:root[data-theme='dark'] {
+  --app-bg: #171316;
+  --app-surface: #241c20;
+  --app-text: #fff7f8;
+}
+
+:root[data-theme='dark'] body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+}
+
+:root[data-theme='dark'] .app-shell [style*='background: #FFFFFF'],
+:root[data-theme='dark'] .app-shell [style*='background: rgb(255, 255, 255)'] {
+  background: var(--app-surface) !important;
+}
+
+/* Hide scrollbar but allow scrolling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #FCD3D9;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #E28B9B;
+}
+
+/* Recharts custom tooltip */
+.recharts-tooltip-wrapper {
+  outline: none !important;
+}

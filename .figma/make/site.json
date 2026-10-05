@@ -1,0 +1,10 @@
+{
+  "description": "Manage inventory, sales, and analytics for Bromélia Terrários, a botanical shop, with a user-friendly dashboard for streamlined operations and insights.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
