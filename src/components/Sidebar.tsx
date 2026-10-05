@@ -91,7 +91,7 @@ export default function Sidebar({ activeView, setActiveView, mobileOpen, setMobi
             }}
           >
             <ShoppingCart size={16} />
-            Abrir PDV
+            Abrir Caixa
           </button>
         </div>
 
@@ -184,7 +184,7 @@ export function MobileTopBar({
         style={{ background: 'linear-gradient(135deg, #E28B9B, #D66D81)', color: 'white' }}
       >
         <ShoppingCart size={13} />
-        PDV
+        Caixa
       </button>
     </header>
   );
