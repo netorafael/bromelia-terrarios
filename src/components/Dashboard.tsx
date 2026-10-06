@@ -27,6 +27,7 @@ function MetricCard({
   positive,
   icon: Icon,
   accent,
+  onClick,
 }: {
   label: string;
   value: string;
@@ -34,9 +35,21 @@ function MetricCard({
   positive: boolean;
   icon: React.ElementType;
   accent?: boolean;
+  onClick?: () => void;
 }) {
+  const isInteractive = Boolean(onClick);
+
   return (
     <div
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (isInteractive && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
       className="rounded-2xl p-5 flex flex-col gap-4"
       style={{
         background: accent ? 'linear-gradient(135deg, #E28B9B, #D66D81)' : '#FFFFFF',
@@ -44,6 +57,7 @@ function MetricCard({
         boxShadow: accent
           ? '0 4px 20px rgba(214, 109, 129, 0.3)'
           : '0 1px 8px rgba(214, 109, 129, 0.06)',
+        cursor: isInteractive ? 'pointer' : undefined,
       }}
     >
       <div className="flex items-start justify-between">
@@ -116,6 +130,15 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
         supabase.from('products').select('cost_price, inventory_levels(quantity, minimum_quantity)').eq('active', true),
       ]);
       const paidSales = (sales ?? []).filter((sale: any) => sale.status === 'paid');
+      const today = new Date();
+      const revenueToday = paidSales
+        .filter((sale: any) => {
+          const saleDate = new Date(sale.created_at);
+          return saleDate.getFullYear() === today.getFullYear()
+            && saleDate.getMonth() === today.getMonth()
+            && saleDate.getDate() === today.getDate();
+        })
+        .reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
       const trend = new Map<string, number>();
       paidSales.forEach((sale: any) => {
         const month = new Date(sale.created_at).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
@@ -141,7 +164,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
       })));
       const inventoryValue = (products ?? []).reduce((sum: number, product: any) => sum + Number(product.cost_price) * (product.inventory_levels?.[0]?.quantity ?? 0), 0);
       const alerts = (products ?? []).filter((product: any) => (product.inventory_levels?.[0]?.quantity ?? 0) <= (product.inventory_levels?.[0]?.minimum_quantity ?? 0)).length;
-      setMetrics({ revenue: paidSales.reduce((sum: number, sale: any) => sum + Number(sale.total), 0), orders: paidSales.length, inventoryValue, alerts });
+      setMetrics({ revenue: revenueToday, orders: paidSales.length, inventoryValue, alerts });
     };
     void loadDashboard();
   }, []);
@@ -174,7 +197,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
 
       {/* Cards de Métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Receita acumulada" value={`R$ ${metrics.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Atual" positive icon={DollarSign} accent />
+        <MetricCard label="Receita do dia" value={`R$ ${metrics.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Ver detalhes" positive icon={DollarSign} accent onClick={onViewReport} />
         <MetricCard label="Pedidos pagos" value={`${metrics.orders}`} change="Atual" positive icon={Package} />
         <MetricCard label="Valor em Estoque" value={`R$ ${metrics.inventoryValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Atual" positive icon={TrendingUp} />
         <MetricCard label="Alertas de estoque" value={`${metrics.alerts} itens`} change={metrics.alerts ? 'Baixo' : 'OK'} positive={!metrics.alerts} icon={AlertTriangle} />
