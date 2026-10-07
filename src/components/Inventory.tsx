@@ -115,9 +115,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
     const e: Record<string, string> = {};
     if (!form.nome.trim()) e.nome = 'Nome obrigatório';
     if (!form.categoria) e.categoria = 'Selecione uma categoria';
-    if (!form.sku.trim()) e.sku = 'SKU obrigatório';
     if (!String(form.quantidade)) e.quantidade = 'Informe a quantidade';
-    if (!String(form.minimo)) e.minimo = 'Informe o mínimo';
     if (!form.custo.trim()) e.custo = 'Informe o custo';
     return e;
   };
@@ -252,14 +250,8 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
             {erros.categoria && <p className="text-xs mt-1" style={{ color: '#C94B5F' }}>{erros.categoria}</p>}
           </div>
 
-          {/* SKU */}
-          <ProductField label="SKU / Código" field="sku" placeholder="Ex: TER-FIT-001" form={form} errors={erros} onChange={set} />
-
-          {/* Quantidade e Mínimo */}
-          <div className="grid grid-cols-2 gap-3">
-            <ProductField label="Quantidade em Estoque" field="quantidade" placeholder="0" type="number" form={form} errors={erros} onChange={set} />
-            <ProductField label="Nível Mínimo (Reposição)" field="minimo" placeholder="0" type="number" form={form} errors={erros} onChange={set} />
-          </div>
+          {/* Quantidade */}
+          <ProductField label="Quantidade em Estoque" field="quantidade" placeholder="0" type="number" form={form} errors={erros} onChange={set} />
 
           {/* Custo e Preço */}
           <div className="grid grid-cols-2 gap-3">
@@ -452,11 +444,12 @@ export default function Estoque() {
     }
     const categorySlug = novo.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
     const { data: category } = await supabase.from('categories').select('id').eq('slug', categorySlug).maybeSingle();
+    const generatedSku = `${novo.tipo === 'insumo' ? 'INS' : 'TER'}-${Date.now().toString(36).toUpperCase()}`;
     const { data, error } = await supabase.from('products').insert({
       store_id: membership.store_id,
       category_id: category?.id ?? null,
       type: novo.tipo === 'insumo' ? 'supply' : novo.categoria === 'Workshops' ? 'workshop' : 'terrarium',
-      name: novo.nome, sku: novo.sku, cost_price: Number(novo.custo.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
+      name: novo.nome, sku: generatedSku, cost_price: Number(novo.custo.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
       sale_price: novo.preco === '—' ? null : Number(novo.preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
       sellable: novo.tipo !== 'insumo', image_url: novo.img || null,
     }).select('id').single();
@@ -464,12 +457,12 @@ export default function Estoque() {
       setLoadError(error?.message ?? 'Não foi possível criar o produto.');
       return;
     }
-    const { error: inventoryError } = await supabase.from('inventory_levels').insert({ product_id: data.id, quantity: novo.quantidade, minimum_quantity: novo.minimo });
+    const { error: inventoryError } = await supabase.from('inventory_levels').insert({ product_id: data.id, quantity: novo.quantidade, minimum_quantity: 0 });
     if (inventoryError) {
       setLoadError(inventoryError.message);
       return;
     }
-    setItens(prev => [...prev, { ...novo, id: data.id }]);
+    setItens(prev => [...prev, { ...novo, id: data.id, sku: generatedSku, minimo: 0 }]);
     if (novo.tipo !== tab) setTab(novo.tipo);
   }, [tab]);
 
@@ -497,7 +490,7 @@ export default function Estoque() {
   const filtrados = itensDaAba.filter(item => {
     const matchBusca = !busca ||
       item.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      item.sku.toLowerCase().includes(busca.toLowerCase());
+      item.nome.toLowerCase().includes(busca.toLowerCase());
     const matchCategoria = !filtroCategoria || item.categoria === filtroCategoria;
     const matchStatus = !filtroStatus || item.status === filtroStatus;
     return matchBusca && matchCategoria && matchStatus;
@@ -556,7 +549,7 @@ export default function Estoque() {
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#A0A0A3' }} />
             <input
               type="text"
-              placeholder="Buscar por nome ou SKU..."
+              placeholder="Buscar por nome..."
               value={busca}
               onChange={e => setBusca(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none transition-all"
