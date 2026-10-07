@@ -50,6 +50,29 @@ function parseMoney(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatMoneyInput(value: string) {
+  const digitsAndSeparators = value.replace(/[^\d,.]/g, '');
+  if (!digitsAndSeparators) return '';
+
+  const separatorIndex = Math.max(
+    digitsAndSeparators.lastIndexOf(','),
+    digitsAndSeparators.lastIndexOf('.'),
+  );
+  const hasDecimal = separatorIndex >= 0;
+  const integerPart = (hasDecimal
+    ? digitsAndSeparators.slice(0, separatorIndex)
+    : digitsAndSeparators
+  ).replace(/\D/g, '');
+  const decimalPart = hasDecimal
+    ? digitsAndSeparators.slice(separatorIndex + 1).replace(/\D/g, '').slice(0, 2)
+    : '';
+  const formattedInteger = (integerPart || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+  return hasDecimal
+    ? `${formattedInteger},${decimalPart}`
+    : formattedInteger;
+}
+
 // ─── Modal de Novo Produto ───────────────────────────────────────────────────
 
 interface NovoModalProps {
@@ -83,15 +106,17 @@ interface ProductFieldProps {
 }
 
 function ProductField({ label, field, placeholder, type = 'text', form, errors, onChange }: ProductFieldProps) {
+  const isMoneyField = field === 'custo' || field === 'preco';
+
   return (
     <div>
       <label className="block text-xs font-medium mb-1" style={{ color: '#6B6B6E' }}>{label}</label>
       <input
-        type={type}
+        type={isMoneyField ? 'text' : type}
         inputMode={field === 'custo' || field === 'preco' ? 'decimal' : undefined}
         placeholder={placeholder}
         value={String(form[field])}
-        onChange={(event) => onChange(field, event.target.value)}
+        onChange={(event) => onChange(field, isMoneyField ? formatMoneyInput(event.target.value) : event.target.value)}
         className="w-full px-3 py-2 rounded-xl text-sm outline-none transition-all"
         style={{
           background: '#FEF7F1',
