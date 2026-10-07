@@ -160,8 +160,14 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
         total: `R$ ${Number(sale.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         status: sale.status === 'paid' ? 'Pago' : sale.status === 'pending' ? 'Pendente' : sale.status,
       })));
-      const inventoryValue = (products ?? []).reduce((sum: number, product: any) => sum + Number(product.cost_price) * (product.inventory_levels?.[0]?.quantity ?? 0), 0);
-      const availableStock = (products ?? []).reduce((sum: number, product: any) => sum + (product.inventory_levels?.[0]?.quantity ?? 0), 0);
+      const inventoryValue = (products ?? []).reduce((sum: number, product: any) => {
+        const inventory = Array.isArray(product.inventory_levels) ? product.inventory_levels[0] : product.inventory_levels;
+        return sum + Number(product.cost_price) * Number(inventory?.quantity ?? 0);
+      }, 0);
+      const availableStock = (products ?? []).reduce((sum: number, product: any) => {
+        const inventory = Array.isArray(product.inventory_levels) ? product.inventory_levels[0] : product.inventory_levels;
+        return sum + Number(inventory?.quantity ?? 0);
+      }, 0);
       setMetrics({ revenue: revenueToday, orders: salesToday.length, inventoryValue, availableStock });
     };
     void loadDashboard();
