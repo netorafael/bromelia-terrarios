@@ -15,6 +15,7 @@ interface Item {
   tipo: Tipo;
   nome: string;
   categoria: string;
+  categoriaId: string | null;
   sku: string;
   quantidade: number;
   minimo: number;
@@ -24,9 +25,9 @@ interface Item {
   img: string;
 }
 
-const categoriasPorTipo: Record<Tipo, string[]> = {
-  terrario: ['Terrários pequenos', 'Terrários médios', 'Terrários grandes', 'Workshops'],
-};
+const categoriasTerrario = ['Terrários pequenos', 'Terrários médios', 'Terrários grandes', 'Workshops', 'Outro'];
+
+const categoriasPorTipo: Record<Tipo, string[]> = { terrario: categoriasTerrario };
 
 const statusOpcoes: Status[] = ['Em Estoque', 'Estoque Baixo', 'Sem Estoque'];
 
@@ -148,6 +149,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
       ...form,
       quantidade: Number(form.quantidade),
       minimo: Number(form.minimo),
+      categoriaId: null,
       img: imgPreview || `https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=64&h=64&fit=crop&auto=format`,
     });
     onClose();
@@ -429,7 +431,7 @@ export default function Estoque() {
     const carregar = async () => {
       const { data, error } = await supabase
         .from('products')
-        .select('id, type, name, sku, cost_price, sale_price, image_url, categories(name), inventory_levels(quantity, minimum_quantity)')
+        .select('id, type, name, sku, category_id, cost_price, sale_price, image_url, categories(id, name), inventory_levels(quantity, minimum_quantity)')
         .eq('active', true)
         .order('name');
       if (error) {
@@ -445,6 +447,7 @@ export default function Estoque() {
           tipo: 'terrario',
           nome: product.name,
           categoria: product.categories?.name ?? 'Outro',
+          categoriaId: product.categories?.id ?? null,
           sku: product.sku,
           quantidade: quantity,
           minimo: minimum,
@@ -465,11 +468,15 @@ export default function Estoque() {
       return;
     }
     const categorySlug = novo.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
-    const { data: category } = await supabase.from('categories').select('id').eq('slug', categorySlug).maybeSingle();
+    const { data: category } = await supabase.from('categories').select('id').eq('slug', categorySlug).eq('active', true).maybeSingle();
+    if (!category) {
+      setLoadError('Não foi possível localizar a categoria selecionada.');
+      return;
+    }
     const generatedSku = `TER-${Date.now().toString(36).toUpperCase()}`;
     const { data, error } = await supabase.from('products').insert({
       store_id: membership.store_id,
-      category_id: category?.id ?? null,
+      category_id: category.id,
       type: novo.categoria === 'Workshops' ? 'workshop' : 'terrarium',
       name: novo.nome, sku: generatedSku, cost_price: parseMoney(novo.custo),
       sale_price: novo.preco === '—' || !novo.preco.trim() ? null : parseMoney(novo.preco),
@@ -484,8 +491,28 @@ export default function Estoque() {
       setLoadError(inventoryError.message);
       return;
     }
-    setItens(prev => [...prev, { ...novo, id: data.id, sku: generatedSku, minimo: 0 }]);
+    setItens(prev => [...prev, { ...novo, id: data.id, sku: generatedSku, categoriaId: category.id, minimo: 0 }]);
   }, [tab]);
+
+  const atualizarCategoria = async (item: Item, categoria: string) => {
+    const slug = categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('slug', slug)
+      .eq('active', true)
+      .maybeSingle();
+    if (categoryError || !category) {
+      setLoadError(categoryError?.message ?? 'Não foi possível localizar a categoria.');
+      return;
+    }
+    const { error } = await supabase.from('products').update({ category_id: category.id }).eq('id', item.id);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    setItens(prev => prev.map(entry => entry.id === item.id ? { ...entry, categoria: category.name, categoriaId: category.id } : entry));
+  };
 
   const atualizarQuantidade = async (id: string, delta: number) => {
     const item = itens.find((entry) => entry.id === id);
@@ -683,7 +710,17 @@ export default function Estoque() {
                       <span className="font-medium whitespace-nowrap" style={{ color: '#1C1C1E' }}>{item.nome}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.categoria}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <select
+                      value={item.categoria}
+                      onChange={event => void atualizarCategoria(item, event.target.value)}
+                      className="bg-transparent text-sm outline-none cursor-pointer"
+                      style={{ color: '#6B6B6E' }}
+                      aria-label={`Categoria de ${item.nome}`}
+                    >
+                      {categoriasTerrario.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
+                    </select>
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="font-semibold" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}>
                       {item.quantidade}
