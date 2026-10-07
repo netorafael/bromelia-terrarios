@@ -3,7 +3,6 @@ import {
   TrendingDown,
   Package,
   DollarSign,
-  AlertTriangle,
   ArrowUpRight,
 } from 'lucide-react';
 import {
@@ -121,7 +120,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
   const [salesTrend, setSalesTrend] = useState<{ mes: string; receita: number }[]>([]);
   const [categoryData, setCategoryData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [vendasRecentes, setVendasRecentes] = useState<{ id: string; item: string; qty: number; total: string; status: string }[]>([]);
-  const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, inventoryValue: 0, alerts: 0 });
+  const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, inventoryValue: 0, availableStock: 0 });
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -131,14 +130,13 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
       ]);
       const paidSales = (sales ?? []).filter((sale: any) => sale.status === 'paid');
       const today = new Date();
-      const revenueToday = paidSales
-        .filter((sale: any) => {
-          const saleDate = new Date(sale.created_at);
-          return saleDate.getFullYear() === today.getFullYear()
-            && saleDate.getMonth() === today.getMonth()
-            && saleDate.getDate() === today.getDate();
-        })
-        .reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
+      const salesToday = paidSales.filter((sale: any) => {
+        const saleDate = new Date(sale.created_at);
+        return saleDate.getFullYear() === today.getFullYear()
+          && saleDate.getMonth() === today.getMonth()
+          && saleDate.getDate() === today.getDate();
+      });
+      const revenueToday = salesToday.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
       const trend = new Map<string, number>();
       paidSales.forEach((sale: any) => {
         const month = new Date(sale.created_at).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
@@ -163,8 +161,8 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
         status: sale.status === 'paid' ? 'Pago' : sale.status === 'pending' ? 'Pendente' : sale.status,
       })));
       const inventoryValue = (products ?? []).reduce((sum: number, product: any) => sum + Number(product.cost_price) * (product.inventory_levels?.[0]?.quantity ?? 0), 0);
-      const alerts = (products ?? []).filter((product: any) => (product.inventory_levels?.[0]?.quantity ?? 0) <= (product.inventory_levels?.[0]?.minimum_quantity ?? 0)).length;
-      setMetrics({ revenue: revenueToday, orders: paidSales.length, inventoryValue, alerts });
+      const availableStock = (products ?? []).reduce((sum: number, product: any) => sum + (product.inventory_levels?.[0]?.quantity ?? 0), 0);
+      setMetrics({ revenue: revenueToday, orders: salesToday.length, inventoryValue, availableStock });
     };
     void loadDashboard();
   }, []);
@@ -198,9 +196,9 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
       {/* Cards de Métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label="Receita do dia" value={`R$ ${metrics.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Ver detalhes" positive icon={DollarSign} accent onClick={onViewReport} />
-        <MetricCard label="Pedidos pagos" value={`${metrics.orders}`} change="Atual" positive icon={Package} />
+        <MetricCard label="Vendas realizadas hoje" value={`${metrics.orders}`} change="Hoje" positive icon={Package} />
         <MetricCard label="Valor em Estoque" value={`R$ ${metrics.inventoryValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Atual" positive icon={TrendingUp} />
-        <MetricCard label="Alertas de estoque" value={`${metrics.alerts} itens`} change={metrics.alerts ? 'Baixo' : 'OK'} positive={!metrics.alerts} icon={AlertTriangle} />
+        <MetricCard label="Estoque disponível" value={`${metrics.availableStock} itens`} change="Atual" positive icon={Package} />
       </div>
 
       {/* Gráficos */}
