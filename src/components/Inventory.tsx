@@ -685,7 +685,7 @@ export default function Estoque() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(252,211,217,0.3)', background: '#FEF7F1' }}>
-                {['Produto', 'Categoria', 'Qtd.', 'Mínimo', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
+                {['Produto', 'Categoria', 'Qtd.', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap" style={{ color: '#A0A0A3' }}>
                     {h}
                   </th>
@@ -744,7 +744,6 @@ export default function Estoque() {
                       aria-label={`Quantidade em estoque de ${item.nome}`}
                     />
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.minimo}</td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.custo}</td>
                   <td className="px-4 py-3 font-medium whitespace-nowrap" style={{ color: '#1C1C1E' }}>{item.preco}</td>
                   <td className="px-4 py-3">
