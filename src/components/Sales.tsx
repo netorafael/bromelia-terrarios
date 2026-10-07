@@ -128,7 +128,7 @@ export default function Sales({ onViewHistory }: { onViewHistory: () => void }) 
           className="text-2xl font-semibold"
           style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}
         >
-          Vendas & PDV
+          Vendas
         </h1>
         <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>
           Controle de caixa e vendas

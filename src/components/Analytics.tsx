@@ -85,7 +85,7 @@ export default function Analytics() {
           className="text-2xl font-semibold"
           style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}
         >
-          Análises & Insights
+          Análises
         </h1>
         <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>
           Desempenho geral — Jan a Set 2026

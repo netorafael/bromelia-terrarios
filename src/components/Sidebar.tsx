@@ -14,7 +14,7 @@ import {
 const navItems = [
   { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
   { id: 'inventory', label: 'Estoque', icon: Package },
-  { id: 'sales', label: 'Vendas & PDV', icon: ShoppingCart },
+  { id: 'sales', label: 'Vendas', icon: ShoppingCart },
   { id: 'analytics', label: 'Análises', icon: BarChart3 },
   { id: 'weekly-report', label: 'Relatório semanal', icon: FileBarChart },
   { id: 'settings', label: 'Configurações', icon: Settings },

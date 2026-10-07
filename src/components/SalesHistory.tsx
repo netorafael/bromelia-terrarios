@@ -80,7 +80,7 @@ export default function SalesHistory({ onBack }: { onBack: () => void }) {
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <button onClick={onBack} className="flex items-center gap-1 text-xs mb-3" style={{ color: '#D66D81' }}><ArrowLeft size={14} /> Voltar para Vendas & PDV</button>
+          <button onClick={onBack} className="flex items-center gap-1 text-xs mb-3" style={{ color: '#D66D81' }}><ArrowLeft size={14} /> Voltar para Vendas</button>
           <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>Histórico de vendas</h1>
           <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>Consulte, registre vendas antigas ou exclua lançamentos de teste.</p>
         </div>
