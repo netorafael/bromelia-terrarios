@@ -1,4 +1,4 @@
-export type ProductType = 'terrarium' | 'workshop' | 'supply';
+export type ProductType = 'terrarium' | 'workshop';
 export type SaleStatus = 'pending' | 'paid' | 'cancelled' | 'refunded';
 export type PaymentMethod = 'pix' | 'card' | 'cash';
 

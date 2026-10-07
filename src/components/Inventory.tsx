@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Search, Plus, X, Camera, Image, ChevronDown, Check,
-  Package, Leaf, AlertTriangle, Minus,
+  Package, AlertTriangle,
   Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-type Tipo = 'terrario' | 'insumo';
+type Tipo = 'terrario';
 type Status = 'Em Estoque' | 'Estoque Baixo' | 'Sem Estoque';
-type Tab = 'terrario' | 'insumo';
+type Tab = 'terrario';
 
 interface Item {
   id: string;
@@ -26,7 +26,6 @@ interface Item {
 
 const categoriasPorTipo: Record<Tipo, string[]> = {
   terrario: ['Terrários pequenos', 'Terrários médios', 'Terrários grandes', 'Workshops'],
-  insumo: ['Substrato', 'Recipiente', 'Planta', 'Pedra', 'Ferramenta', 'Outro'],
 };
 
 const statusOpcoes: Status[] = ['Em Estoque', 'Estoque Baixo', 'Sem Estoque'];
@@ -229,7 +228,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
           <div>
             <label className="block text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Tipo de Produto</label>
             <div className="grid grid-cols-2 gap-2">
-              {([['terrario', 'Terrário', Package], ['insumo', 'Insumo / Matéria-Prima', Leaf]] as const).map(([val, label, Icon]) => (
+              {([['terrario', 'Terrário', Package]] as const).map(([val, label, Icon]) => (
                 <button
                   key={val}
                   onClick={() => { set('tipo', val); set('categoria', ''); }}
@@ -281,7 +280,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
             <ProductField
               label={form.tipo === 'terrario' ? 'Preço de Venda' : 'Preço de Venda (opcional)'}
               field="preco"
-              placeholder={form.tipo === 'insumo' ? '—' : 'R$ 0,00'}
+              placeholder="R$ 0,00"
               form={form}
               errors={erros}
               onChange={set}
@@ -440,9 +439,10 @@ export default function Estoque() {
       setItens((data ?? []).map((product: any) => {
         const quantity = product.inventory_levels?.quantity ?? 0;
         const minimum = product.inventory_levels?.minimum_quantity ?? 0;
+        if (product.type === 'supply') return null;
         return {
           id: product.id,
-          tipo: product.type === 'supply' ? 'insumo' : 'terrario',
+          tipo: 'terrario',
           nome: product.name,
           categoria: product.categories?.name ?? 'Outro',
           sku: product.sku,
@@ -453,7 +453,7 @@ export default function Estoque() {
           status: quantity === 0 ? 'Sem Estoque' : quantity <= minimum ? 'Estoque Baixo' : 'Em Estoque',
           img: product.image_url ?? 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=64&h=64&fit=crop&auto=format',
         };
-      }));
+      }).filter(Boolean) as Item[]);
     };
     void carregar();
   }, []);
@@ -466,14 +466,14 @@ export default function Estoque() {
     }
     const categorySlug = novo.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
     const { data: category } = await supabase.from('categories').select('id').eq('slug', categorySlug).maybeSingle();
-    const generatedSku = `${novo.tipo === 'insumo' ? 'INS' : 'TER'}-${Date.now().toString(36).toUpperCase()}`;
+    const generatedSku = `TER-${Date.now().toString(36).toUpperCase()}`;
     const { data, error } = await supabase.from('products').insert({
       store_id: membership.store_id,
       category_id: category?.id ?? null,
-      type: novo.tipo === 'insumo' ? 'supply' : novo.categoria === 'Workshops' ? 'workshop' : 'terrarium',
+      type: novo.categoria === 'Workshops' ? 'workshop' : 'terrarium',
       name: novo.nome, sku: generatedSku, cost_price: parseMoney(novo.custo),
       sale_price: novo.preco === '—' || !novo.preco.trim() ? null : parseMoney(novo.preco),
-      sellable: novo.tipo !== 'insumo', image_url: novo.img || null,
+      sellable: true, image_url: novo.img || null,
     }).select('id').single();
     if (error || !data) {
       setLoadError(error?.message ?? 'Não foi possível criar o produto.');
@@ -485,7 +485,6 @@ export default function Estoque() {
       return;
     }
     setItens(prev => [...prev, { ...novo, id: data.id, sku: generatedSku, minimo: 0 }]);
-    if (novo.tipo !== tab) setTab(novo.tipo);
   }, [tab]);
 
   const atualizarQuantidade = async (id: string, delta: number) => {
@@ -540,7 +539,7 @@ export default function Estoque() {
             Estoque
           </h1>
           <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>
-            Gestão de produtos e insumos
+            Gestão de produtos
           </p>
         </div>
         <button
@@ -556,7 +555,7 @@ export default function Estoque() {
 
       {/* Abas */}
       <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: '#FDE0E2' }}>
-        {([['terrario', 'Terrários Prontos', Package], ['insumo', 'Insumos & Matérias-Primas', Leaf]] as const).map(([id, label, Icon]) => (
+        {([['terrario', 'Terrários Prontos', Package]] as const).map(([id, label, Icon]) => (
           <button
             key={id}
             onClick={() => { setTab(id); setFiltroCategoria(''); setFiltroStatus(''); }}
@@ -569,7 +568,7 @@ export default function Estoque() {
           >
             <Icon size={14} />
             <span className="hidden sm:inline">{label}</span>
-            <span className="sm:hidden">{id === 'terrario' ? 'Terrários' : 'Insumos'}</span>
+            <span className="sm:hidden">Terrários</span>
           </button>
         ))}
       </div>
@@ -659,7 +658,7 @@ export default function Estoque() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(252,211,217,0.3)', background: '#FEF7F1' }}>
-                {['Produto', 'Categoria', tab === 'insumo' ? 'Qtd. em uso' : 'Qtd.', 'Mínimo', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
+                {['Produto', 'Categoria', 'Qtd.', 'Mínimo', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap" style={{ color: '#A0A0A3' }}>
                     {h}
                   </th>
@@ -686,35 +685,9 @@ export default function Estoque() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.categoria}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {item.tipo === 'insumo' ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={e => { e.stopPropagation(); atualizarQuantidade(item.id, -1); }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors hover:bg-pink-100 flex-shrink-0"
-                          style={{ background: '#FDE0E2' }}
-                          disabled={item.quantidade === 0}
-                        >
-                          <Minus size={10} style={{ color: item.quantidade === 0 ? '#C0C0C3' : '#D66D81' }} />
-                        </button>
-                        <span
-                          className="w-8 text-center font-semibold text-sm tabular-nums"
-                          style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}
-                        >
-                          {item.quantidade}
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); atualizarQuantidade(item.id, 1); }}
-                          className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors hover:bg-pink-100 flex-shrink-0"
-                          style={{ background: '#FDE0E2' }}
-                        >
-                          <Plus size={10} style={{ color: '#D66D81' }} />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="font-semibold" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}>
-                        {item.quantidade}
-                      </span>
-                    )}
+                    <span className="font-semibold" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}>
+                      {item.quantidade}
+                    </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.minimo}</td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.custo}</td>
