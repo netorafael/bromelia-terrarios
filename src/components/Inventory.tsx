@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Search, Plus, X, Camera, Image, ChevronDown, Check,
   Package, Leaf, AlertTriangle, Minus,
+  Trash2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -34,6 +35,19 @@ function statusStyle(s: Status) {
   if (s === 'Em Estoque') return { background: '#F9E8EC', color: '#D66D81' };
   if (s === 'Estoque Baixo') return { background: '#FDE0E2', color: '#C94B5F' };
   return { background: '#F0F0F0', color: '#888' };
+}
+
+function parseMoney(value: string) {
+  const normalized = value.trim().replace(/[^\d,.-]/g, '');
+  if (!normalized) return 0;
+  const lastComma = normalized.lastIndexOf(',');
+  const lastDot = normalized.lastIndexOf('.');
+  const decimalSeparator = lastComma > lastDot ? ',' : lastDot > -1 ? '.' : null;
+  const numberValue = decimalSeparator
+    ? normalized.replace(decimalSeparator === ',' ? /\./g : /,/g, '').replace(decimalSeparator, '.')
+    : normalized;
+  const parsed = Number(numberValue);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 // ─── Modal de Novo Produto ───────────────────────────────────────────────────
@@ -74,6 +88,7 @@ function ProductField({ label, field, placeholder, type = 'text', form, errors, 
       <label className="block text-xs font-medium mb-1" style={{ color: '#6B6B6E' }}>{label}</label>
       <input
         type={type}
+        inputMode={field === 'custo' || field === 'preco' ? 'decimal' : undefined}
         placeholder={placeholder}
         value={String(form[field])}
         onChange={(event) => onChange(field, event.target.value)}
@@ -449,8 +464,8 @@ export default function Estoque() {
       store_id: membership.store_id,
       category_id: category?.id ?? null,
       type: novo.tipo === 'insumo' ? 'supply' : novo.categoria === 'Workshops' ? 'workshop' : 'terrarium',
-      name: novo.nome, sku: generatedSku, cost_price: Number(novo.custo.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
-      sale_price: novo.preco === '—' ? null : Number(novo.preco.replace(/[^\d,]/g, '').replace(',', '.')) || 0,
+      name: novo.nome, sku: generatedSku, cost_price: parseMoney(novo.custo),
+      sale_price: novo.preco === '—' || !novo.preco.trim() ? null : parseMoney(novo.preco),
       sellable: novo.tipo !== 'insumo', image_url: novo.img || null,
     }).select('id').single();
     if (error || !data) {
@@ -482,6 +497,16 @@ export default function Estoque() {
         novaQtd <= item.minimo ? 'Estoque Baixo' : 'Em Estoque';
       return { ...item, quantidade: novaQtd, status: novoStatus };
     }));
+  };
+
+  const removerProduto = async (item: Item) => {
+    if (!window.confirm(`Excluir o produto "${item.nome}"?`)) return;
+    const { error } = await supabase.from('products').update({ active: false }).eq('id', item.id);
+    if (error) {
+      setLoadError(error.message);
+      return;
+    }
+    setItens(prev => prev.filter(entry => entry.id !== item.id));
   };
 
   const itensDaAba = itens.filter(i => i.tipo === tab);
@@ -627,7 +652,7 @@ export default function Estoque() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(252,211,217,0.3)', background: '#FEF7F1' }}>
-                {['Produto', 'Categoria', 'SKU', tab === 'insumo' ? 'Qtd. em uso' : 'Qtd.', 'Mínimo', 'Custo', 'Preço de Venda', 'Status'].map(h => (
+                {['Produto', 'Categoria', tab === 'insumo' ? 'Qtd. em uso' : 'Qtd.', 'Mínimo', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap" style={{ color: '#A0A0A3' }}>
                     {h}
                   </th>
@@ -653,7 +678,6 @@ export default function Estoque() {
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.categoria}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-xs font-mono" style={{ color: '#A0A0A3' }}>{item.sku}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {item.tipo === 'insumo' ? (
                       <div className="flex items-center gap-1.5">
@@ -695,6 +719,17 @@ export default function Estoque() {
                     >
                       {item.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => void removerProduto(item)}
+                      className="p-2 rounded-lg transition-colors hover:bg-pink-50"
+                      title="Excluir produto"
+                      aria-label={`Excluir ${item.nome}`}
+                    >
+                      <Trash2 size={15} style={{ color: '#C94B5F' }} />
+                    </button>
                   </td>
                 </tr>
               ))}
