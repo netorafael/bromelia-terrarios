@@ -51,26 +51,15 @@ function parseMoney(value: string) {
 }
 
 function formatMoneyInput(value: string) {
-  const digitsAndSeparators = value.replace(/[^\d,.]/g, '');
-  if (!digitsAndSeparators) return '';
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
 
-  const separatorIndex = Math.max(
-    digitsAndSeparators.lastIndexOf(','),
-    digitsAndSeparators.lastIndexOf('.'),
-  );
-  const hasDecimal = separatorIndex >= 0;
-  const integerPart = (hasDecimal
-    ? digitsAndSeparators.slice(0, separatorIndex)
-    : digitsAndSeparators
-  ).replace(/\D/g, '');
-  const decimalPart = hasDecimal
-    ? digitsAndSeparators.slice(separatorIndex + 1).replace(/\D/g, '').slice(0, 2)
-    : '';
-  const formattedInteger = (integerPart || '0').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const paddedDigits = digits.padStart(3, '0');
+  const integerPart = paddedDigits.slice(0, -2);
+  const decimalPart = paddedDigits.slice(-2);
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
-  return hasDecimal
-    ? `${formattedInteger},${decimalPart}`
-    : formattedInteger;
+  return `${formattedInteger},${decimalPart}`;
 }
 
 // ─── Modal de Novo Produto ───────────────────────────────────────────────────
