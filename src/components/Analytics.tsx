@@ -37,7 +37,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function Analytics() {
   const [dadosMensais, setDadosMensais] = useState<{ mes: string; receita: number; pedidos: number }[]>([]);
-  const [topProdutos, setTopProdutos] = useState<{ name: string; vendas: number; margem: number }[]>([]);
+  const [topProdutos, setTopProdutos] = useState<{ name: string; vendas: number; percentual: number }[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
 
@@ -57,14 +57,23 @@ export default function Analytics() {
         (sale.sale_items ?? []).forEach((item: any) => {
           const currentProduct = products.get(item.product_name_snapshot) ?? { vendas: 0, revenue: 0, cost: 0 };
           products.set(item.product_name_snapshot, {
-            vendas: currentProduct.vendas + item.quantity,
-            revenue: currentProduct.revenue + Number(item.unit_price) * item.quantity,
-            cost: currentProduct.cost + Number(item.unit_cost_snapshot) * item.quantity,
+            vendas: currentProduct.vendas + Number(item.quantity),
+            revenue: currentProduct.revenue + Number(item.unit_price) * Number(item.quantity),
+            cost: currentProduct.cost + Number(item.unit_cost_snapshot) * Number(item.quantity),
           });
         });
       });
+      const totalUnitsSold = [...products.values()].reduce((sum, product) => sum + product.vendas, 0);
       setDadosMensais(Array.from(monthly, ([mes, values]) => ({ mes, ...values })));
-      setTopProdutos(Array.from(products, ([name, values]) => ({ name, vendas: values.vendas, margem: values.revenue ? Math.round(((values.revenue - values.cost) / values.revenue) * 100) : 0 })).sort((a, b) => b.vendas - a.vendas).slice(0, 5));
+      setTopProdutos(
+        Array.from(products, ([name, values]) => ({
+          name,
+          vendas: values.vendas,
+          percentual: totalUnitsSold ? Math.round((values.vendas / totalUnitsSold) * 100) : 0,
+        }))
+          .sort((a, b) => b.vendas - a.vendas || a.name.localeCompare(b.name))
+          .slice(0, 5),
+      );
     };
     void loadAnalytics();
   }, []);
@@ -171,7 +180,7 @@ export default function Analytics() {
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${(p.vendas / 25) * 100}%`,
+                      width: `${p.percentual}%`,
                       background: 'linear-gradient(90deg, #E28B9B, #D66D81)',
                     }}
                   />
@@ -181,7 +190,7 @@ export default function Analytics() {
                 className="flex-shrink-0 px-2 py-0.5 rounded-lg text-xs font-medium"
                 style={{ background: '#F9E8EC', color: '#D66D81' }}
               >
-                {p.margem}% mg
+                {p.percentual}%
               </div>
             </div>
           ))}
