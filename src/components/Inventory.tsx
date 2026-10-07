@@ -514,10 +514,10 @@ export default function Estoque() {
     setItens(prev => prev.map(entry => entry.id === item.id ? { ...entry, categoria: category.name, categoriaId: category.id } : entry));
   };
 
-  const atualizarQuantidade = async (id: string, delta: number) => {
+  const atualizarQuantidade = async (id: string, quantidade: number) => {
     const item = itens.find((entry) => entry.id === id);
     if (!item) return;
-    const novaQtd = Math.max(0, item.quantidade + delta);
+    const novaQtd = Math.max(0, Math.floor(Number.isFinite(quantidade) ? quantidade : 0));
     const { error } = await supabase.from('inventory_levels').update({ quantity: novaQtd }).eq('product_id', id);
     if (error) {
       setLoadError(error.message);
@@ -722,9 +722,27 @@ export default function Estoque() {
                     </select>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-semibold" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}>
-                      {item.quantidade}
-                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={item.quantidade}
+                      onChange={event => {
+                        const quantidade = Number(event.target.value);
+                        if (!Number.isFinite(quantidade) || quantidade < 0) return;
+                        setItens(prev => prev.map(entry => entry.id === item.id
+                          ? { ...entry, quantidade: Math.floor(quantidade) }
+                          : entry));
+                      }}
+                      onBlur={event => void atualizarQuantidade(item.id, Number(event.target.value))}
+                      className="w-20 rounded-lg px-2 py-1 text-sm font-semibold outline-none"
+                      style={{
+                        color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E',
+                        border: '1px solid rgba(252,211,217,0.6)',
+                        background: '#FFF9F6',
+                      }}
+                      aria-label={`Quantidade em estoque de ${item.nome}`}
+                    />
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.minimo}</td>
                   <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.custo}</td>
