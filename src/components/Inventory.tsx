@@ -38,15 +38,10 @@ function statusStyle(s: Status) {
 }
 
 function parseMoney(value: string) {
-  const normalized = value.trim().replace(/[^\d,.-]/g, '');
-  if (!normalized) return 0;
-  const lastComma = normalized.lastIndexOf(',');
-  const lastDot = normalized.lastIndexOf('.');
-  const decimalSeparator = lastComma > lastDot ? ',' : lastDot > -1 ? '.' : null;
-  const numberValue = decimalSeparator
-    ? normalized.replace(decimalSeparator === ',' ? /\./g : /,/g, '').replace(decimalSeparator, '.')
-    : normalized;
-  const parsed = Number(numberValue);
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return 0;
+
+  const parsed = Number(digits) / 100;
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -54,12 +49,10 @@ function formatMoneyInput(value: string) {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';
 
-  const paddedDigits = digits.padStart(3, '0');
-  const integerPart = paddedDigits.slice(0, -2);
-  const decimalPart = paddedDigits.slice(-2);
-  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-  return `${formattedInteger},${decimalPart}`;
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(Number(digits) / 100);
 }
 
 // ─── Modal de Novo Produto ───────────────────────────────────────────────────
