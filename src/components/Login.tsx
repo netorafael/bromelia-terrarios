@@ -23,6 +23,17 @@ export default function Login({ onLogin }: LoginProps) {
       setLoading(false);
       return;
     }
+    const pendingInvite = localStorage.getItem('bromelia-pending-invite');
+    if (pendingInvite) {
+      const { error: inviteError } = await supabase.rpc('accept_store_invitation', { p_token: pendingInvite });
+      if (inviteError) {
+        await supabase.auth.signOut();
+        setError(inviteError.message);
+        setLoading(false);
+        return;
+      }
+      localStorage.removeItem('bromelia-pending-invite');
+    }
     onLogin();
   };
 

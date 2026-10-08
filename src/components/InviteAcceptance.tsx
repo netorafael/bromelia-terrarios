@@ -1,15 +1,13 @@
 import { FormEvent, useState } from 'react';
-import { CheckCircle, Leaf, AlertCircle } from 'lucide-react';
+import { Leaf, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function InviteAcceptance({ token }: { token: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [accountCreated, setAccountCreated] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -23,39 +21,19 @@ export default function InviteAcceptance({ token }: { token: string }) {
       return;
     }
     setLoading(true);
-    if (!accountCreated) {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { invite_token: token, display_name: email.trim().split('@')[0] } },
-      });
-      if (signUpError) {
-        setError(signUpError.message);
-        setLoading(false);
-        return;
-      }
-      if (!data.session) {
-        setAccountCreated(true);
-        setMessage('Conta criada. Confirme seu e-mail e depois volte a esta página para concluir o convite.');
-        setLoading(false);
-        return;
-      }
-    } else {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (signInError) {
-        setError('Confirme o e-mail antes de continuar e tente novamente.');
-        setLoading(false);
-        return;
-      }
-    }
-    const { error: acceptError } = await supabase.rpc('accept_store_invitation', { p_token: token });
-    if (acceptError) {
-      setError(acceptError.message);
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { data: { invite_token: token, display_name: email.trim().split('@')[0] } },
+    });
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
       return;
     }
-    setMessage('Convite aceito. Sua conta está pronta para acessar o sistema.');
-    setLoading(false);
+    localStorage.setItem('bromelia-pending-invite', token);
+    await supabase.auth.signOut();
+    window.location.replace('/');
   };
 
   return (
@@ -66,18 +44,13 @@ export default function InviteAcceptance({ token }: { token: string }) {
           <h1 className="text-xl font-semibold" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>Convite Bromélia</h1>
           <p className="text-sm mt-1 text-center" style={{ color: '#A0A0A3' }}>Crie sua conta para entrar na equipe.</p>
         </div>
-        {message && !accountCreated ? (
-          <div className="rounded-xl px-4 py-3 text-sm flex gap-2" style={{ background: '#F9E8EC', color: '#D66D81' }}><CheckCircle size={17} />{message}</div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
-            {accountCreated && <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: '#F9E8EC', color: '#D66D81' }}>Confirme o e-mail enviado e informe sua senha para concluir.</div>}
+        <form onSubmit={submit} className="space-y-4">
             <input required type="email" placeholder="E-mail do convite" value={email} onChange={e => setEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm outline-none" style={{ background: '#FEF7F1', border: '1px solid rgba(252,211,217,0.6)' }} />
             <input required type="password" minLength={8} placeholder="Crie uma senha" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm outline-none" style={{ background: '#FEF7F1', border: '1px solid rgba(252,211,217,0.6)' }} />
             <input required type="password" minLength={8} placeholder="Confirme a senha" value={confirmation} onChange={e => setConfirmation(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm outline-none" style={{ background: '#FEF7F1', border: '1px solid rgba(252,211,217,0.6)' }} />
             {error && <div className="flex gap-2 rounded-xl px-3 py-2.5 text-xs" style={{ background: '#FDE0E2', color: '#C94B5F' }}><AlertCircle size={14} />{error}</div>}
             <button disabled={loading} className="w-full py-3 rounded-xl text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg, #E28B9B, #D66D81)' }}>{loading ? 'Criando conta...' : 'Aceitar convite'}</button>
-          </form>
-        )}
+        </form>
       </div>
     </div>
   );

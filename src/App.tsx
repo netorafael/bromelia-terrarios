@@ -24,10 +24,6 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('bromelia-dark-mode') === 'true');
 
-  if (inviteToken) {
-    return <InviteAcceptance token={inviteToken} />;
-  }
-
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
     localStorage.setItem('bromelia-dark-mode', String(darkMode));
@@ -70,6 +66,10 @@ export default function App() {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  if (inviteToken && !loggedIn) {
+    return <InviteAcceptance token={inviteToken} />;
+  }
 
   if (!sessionReady) {
     return <div className="min-h-screen flex items-center justify-center" style={{ background: '#FEF7F1', color: '#D66D81' }}>Carregando...</div>;
