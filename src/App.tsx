@@ -78,7 +78,7 @@ export default function App() {
     return <Login onLogin={() => setLoggedIn(true)} />;
   }
   if (!accessReady || !role) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ background: '#FEF7F1', color: '#D66D81' }}>Acesso aguardando aprovação administrativa.</div>;
+    return <div className="min-h-screen flex items-center justify-center" style={{ background: '#FEF7F1', color: '#D66D81' }}>Carregando...</div>;
   }
 
   const renderView = () => {
