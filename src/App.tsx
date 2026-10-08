@@ -11,10 +11,13 @@ import WeeklyReport from './components/WeeklyReport';
 import { supabase } from './lib/supabase';
 
 type View = 'dashboard' | 'inventory' | 'sales' | 'sales-history' | 'analytics' | 'weekly-report' | 'settings';
+export type UserRole = 'admin' | 'seller';
 
 export default function App() {
   const [sessionReady, setSessionReady] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [accessReady, setAccessReady] = useState(false);
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('bromelia-dark-mode') === 'true');
@@ -26,17 +29,35 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
+    const loadAccess = async (session: { user: { id: string } } | null) => {
+      if (!session) {
+        if (mounted) {
+          setRole(null);
+          setLoggedIn(false);
+          setAccessReady(true);
+        }
+        return;
+      }
+      await supabase.rpc('ensure_current_user_setup');
+      const { data: membership } = await supabase
+        .from('store_users')
+        .select('role')
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle();
+      if (mounted) {
+        setRole((membership?.role as UserRole | null) ?? null);
+        setLoggedIn(true);
+        setAccessReady(true);
+      }
+    };
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) console.error('Não foi possível recuperar a sessão:', error);
-      if (data.session) void supabase.rpc('ensure_current_user_setup');
-      if (mounted) {
-        setLoggedIn(Boolean(data.session));
-        setSessionReady(true);
-      }
+      void loadAccess(data.session);
+      if (mounted) setSessionReady(true);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setLoggedIn(Boolean(session));
-      setSessionReady(true);
+      setTimeout(() => void loadAccess(session), 0);
     });
     return () => {
       mounted = false;
@@ -50,16 +71,19 @@ export default function App() {
   if (!loggedIn) {
     return <Login onLogin={() => setLoggedIn(true)} />;
   }
+  if (!accessReady || !role) {
+    return <div className="min-h-screen flex items-center justify-center" style={{ background: '#FEF7F1', color: '#D66D81' }}>Acesso aguardando aprovação administrativa.</div>;
+  }
 
   const renderView = () => {
     switch (activeView) {
-      case 'dashboard':  return <Dashboard onViewReport={() => setActiveView('analytics')} />;
-      case 'inventory':  return <Estoque />;
-      case 'sales':      return <Sales onViewHistory={() => setActiveView('sales-history')} />;
-      case 'sales-history': return <SalesHistory onBack={() => setActiveView('sales')} />;
-      case 'analytics':  return <Analytics />;
-      case 'weekly-report': return <WeeklyReport />;
-      case 'settings':   return <SettingsView darkMode={darkMode} onDarkModeChange={setDarkMode} />;
+      case 'dashboard':  return role === 'admin' ? <Dashboard onViewReport={() => setActiveView('analytics')} /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'inventory':  return role === 'admin' ? <Estoque /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'sales':      return <Sales isAdmin={role === 'admin'} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'sales-history': return role === 'admin' ? <SalesHistory onBack={() => setActiveView('sales')} /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'analytics':  return role === 'admin' ? <Analytics /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'weekly-report': return role === 'admin' ? <WeeklyReport /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
+      case 'settings':   return role === 'admin' ? <SettingsView darkMode={darkMode} onDarkModeChange={setDarkMode} /> : <Sales isAdmin={false} onViewHistory={() => setActiveView('sales-history')} />;
     }
   };
 
@@ -67,6 +91,7 @@ export default function App() {
     <div className="min-h-screen app-shell" style={{ background: 'var(--app-bg)' }}>
       <Sidebar
         activeView={activeView}
+        role={role}
         setActiveView={(v) => setActiveView(v as View)}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}

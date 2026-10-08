@@ -518,7 +518,10 @@ export default function Estoque() {
     const item = itens.find((entry) => entry.id === id);
     if (!item) return;
     const novaQtd = Math.max(0, Math.floor(Number.isFinite(quantidade) ? quantidade : 0));
-    const { error } = await supabase.from('inventory_levels').update({ quantity: novaQtd }).eq('product_id', id);
+    const { error } = await supabase.rpc('set_inventory_quantity', {
+      p_product_id: id,
+      p_quantity: novaQtd,
+    });
     if (error) {
       setLoadError(error.message);
       return;

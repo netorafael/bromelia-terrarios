@@ -10,6 +10,7 @@ import {
   X,
   LogOut,
 } from 'lucide-react';
+import type { UserRole } from '../App';
 
 const navItems = [
   { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard },
@@ -22,13 +23,14 @@ const navItems = [
 
 interface SidebarProps {
   activeView: string;
+  role: UserRole;
   setActiveView: (view: string) => void;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
   onLogout: () => void;
 }
 
-export default function Sidebar({ activeView, setActiveView, mobileOpen, setMobileOpen, onLogout }: SidebarProps) {
+export default function Sidebar({ activeView, role, setActiveView, mobileOpen, setMobileOpen, onLogout }: SidebarProps) {
   const handleNav = (id: string) => {
     setActiveView(id);
     setMobileOpen(false);
@@ -97,7 +99,7 @@ export default function Sidebar({ activeView, setActiveView, mobileOpen, setMobi
 
         {/* Nav */}
         <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
-          {navItems.map(({ id, label, icon: Icon }) => {
+          {navItems.filter(({ id }) => role === 'admin' || id === 'sales').map(({ id, label, icon: Icon }) => {
             const active = activeView === id;
             return (
               <button
@@ -127,7 +129,7 @@ export default function Sidebar({ activeView, setActiveView, mobileOpen, setMobi
               AD
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium" style={{ color: '#1C1C1E' }}>Administrador</div>
+              <div className="text-sm font-medium" style={{ color: '#1C1C1E' }}>{role === 'admin' ? 'Administrador' : 'Vendedor'}</div>
               <div className="text-xs truncate" style={{ color: '#A0A0A3' }}>Loja Principal</div>
             </div>
           </div>

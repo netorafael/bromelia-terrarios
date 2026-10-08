@@ -14,13 +14,14 @@ interface CartItem {
   qty: number;
 }
 
-export default function Sales({ onViewHistory }: { onViewHistory: () => void }) {
+export default function Sales({ isAdmin, onViewHistory }: { isAdmin: boolean; onViewHistory: () => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadError, setLoadError] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [payment, setPayment] = useState<PaymentMethod>('pix');
   const [success, setSuccess] = useState(false);
   const [finalTotal, setFinalTotal] = useState('');
+  const [todaySales, setTodaySales] = useState({ count: 0, total: 0 });
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -35,6 +36,23 @@ export default function Sales({ onViewHistory }: { onViewHistory: () => void }) 
     };
     void loadProducts();
   }, []);
+
+  useEffect(() => {
+    const loadTodaySales = async () => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const { data } = await supabase
+        .from('sales')
+        .select('total')
+        .eq('status', 'paid')
+        .gte('created_at', start.toISOString());
+      setTodaySales({
+        count: data?.length ?? 0,
+        total: (data ?? []).reduce((sum, sale) => sum + Number(sale.total), 0),
+      });
+    };
+    void loadTodaySales();
+  }, [success]);
 
   const addToCart = (product: Product) => {
     setCart((prev) => {
@@ -134,11 +152,17 @@ export default function Sales({ onViewHistory }: { onViewHistory: () => void }) 
           Controle de caixa e vendas
         </p>
         </div>
-        <button onClick={onViewHistory} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: '#FDE0E2', color: '#D66D81' }}>
+        {isAdmin && <button onClick={onViewHistory} className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium" style={{ background: '#FDE0E2', color: '#D66D81' }}>
           <History size={15} /> Histórico de vendas
-        </button>
+        </button>}
       </div>
       {loadError && <div className="rounded-xl px-4 py-3 text-sm" style={{ background: '#FDE0E2', color: '#C94B5F' }}>{loadError}</div>}
+      <div className="rounded-2xl p-4" style={{ background: '#FFFFFF', border: '1px solid rgba(252, 211, 217, 0.4)' }}>
+        <div className="text-xs" style={{ color: '#A0A0A3' }}>Vendas realizadas hoje</div>
+        <div className="text-xl font-semibold mt-1" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
+          {todaySales.count} vendas · R$ {todaySales.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Grade de Produtos */}

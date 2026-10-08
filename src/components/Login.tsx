@@ -7,10 +7,8 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
-  const [passConfirmation, setPassConfirmation] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,29 +16,10 @@ export default function Login({ onLogin }: LoginProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (isSignUp && pass.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
-      return;
-    }
-    if (isSignUp && pass !== passConfirmation) {
-      setError('As senhas não coincidem.');
-      return;
-    }
     setLoading(true);
-    const { data, error: authError } = isSignUp
-      ? await supabase.auth.signUp({
-        email: user.trim(),
-        password: pass,
-        options: { data: { display_name: user.trim().split('@')[0] } },
-      })
-      : await supabase.auth.signInWithPassword({ email: user.trim(), password: pass });
+    const { error: authError } = await supabase.auth.signInWithPassword({ email: user.trim(), password: pass });
     if (authError) {
       setError(authError.message);
-      setLoading(false);
-      return;
-    }
-    if (isSignUp && !data.session) {
-      setError('Conta criada. Verifique seu e-mail para confirmar o acesso.');
       setLoading(false);
       return;
     }
@@ -156,27 +135,6 @@ export default function Login({ onLogin }: LoginProps) {
             </div>
           </div>
 
-          {isSignUp && (
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#6B6B6E' }}>
-                Confirmar senha
-              </label>
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={passConfirmation}
-                onChange={(e) => { setPassConfirmation(e.target.value); setError(''); }}
-                placeholder="Digite a senha novamente"
-                autoComplete="new-password"
-                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
-                style={{
-                  background: '#FEF7F1',
-                  border: error ? '1.5px solid #C94B5F' : '1px solid rgba(252, 211, 217, 0.6)',
-                  color: '#1C1C1E',
-                }}
-              />
-            </div>
-          )}
-
           {/* Erro */}
           {error && (
             <div
@@ -199,18 +157,9 @@ export default function Login({ onLogin }: LoginProps) {
               cursor: user && pass ? 'pointer' : 'not-allowed',
             }}
           >
-            {loading ? (isSignUp ? 'Criando conta...' : 'Entrando...') : (isSignUp ? 'Criar conta' : 'Entrar')}
+            {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
-
-        <button
-          type="button"
-          onClick={() => { setIsSignUp((current) => !current); setError(''); }}
-          className="w-full mt-4 text-xs font-medium"
-          style={{ color: '#D66D81' }}
-        >
-          {isSignUp ? 'Já tenho uma conta' : 'Criar uma conta'}
-        </button>
 
         <p className="text-center text-xs mt-6" style={{ color: '#C0C0C3' }}>
           Sistema exclusivo Bromélia Terrários
