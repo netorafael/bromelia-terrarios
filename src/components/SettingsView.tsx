@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Store, Users, Edit3, Check, X, Moon } from 'lucide-react';
+import { Store, Users, Edit3, Check, X, Moon, Copy, Send, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface StoreInfo {
@@ -56,6 +56,11 @@ export default function SettingsView({ darkMode, onDarkModeChange }: { darkMode:
   const [storeId, setStoreId] = useState('');
   const [error, setError] = useState('');
   const [settingsId, setSettingsId] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'seller' | 'admin'>('seller');
+  const [inviteLink, setInviteLink] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
 
   useEffect(() => {
     const loadStore = async () => {
@@ -119,6 +124,31 @@ export default function SettingsView({ darkMode, onDarkModeChange }: { darkMode:
     { label: 'Endereço', key: 'endereco' },
     { label: 'Cidade', key: 'cidade' },
   ];
+
+  const createInvitation = async () => {
+    setInviteMessage('');
+    setInviteLink('');
+    if (!inviteEmail.trim() || !storeId) return;
+    setInviteLoading(true);
+    const tokenBytes = new Uint8Array(24);
+    crypto.getRandomValues(tokenBytes);
+    const token = Array.from(tokenBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    const { error: inviteError } = await supabase.rpc('create_store_invitation', {
+      p_store_id: storeId,
+      p_email: inviteEmail.trim().toLowerCase(),
+      p_role: inviteRole,
+      p_token: token,
+    });
+    if (inviteError) {
+      setInviteMessage(inviteError.message);
+      setInviteLoading(false);
+      return;
+    }
+    const link = `${window.location.origin}/?invite=${token}`;
+    setInviteLink(link);
+    setInviteMessage('Convite criado. Copie o link ou envie pelo seu aplicativo de e-mail.');
+    setInviteLoading(false);
+  };
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -276,6 +306,24 @@ export default function SettingsView({ darkMode, onDarkModeChange }: { darkMode:
               </span>
             </div>
           ))}
+        </div>
+        <div className="mt-5 pt-5 border-t" style={{ borderColor: 'rgba(252,211,217,0.4)' }}>
+          <div className="flex items-center gap-2 mb-3">
+            <UserPlus size={15} style={{ color: '#D66D81' }} />
+            <span className="text-sm font-semibold" style={{ color: '#1C1C1E' }}>Convidar usuário</span>
+          </div>
+          <div className="grid sm:grid-cols-[1fr_auto] gap-2">
+            <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="email@equipe.com" className="px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: '#FEF7F1', border: '1px solid rgba(252,211,217,0.6)' }} />
+            <select value={inviteRole} onChange={e => setInviteRole(e.target.value as 'seller' | 'admin')} className="px-3 py-2.5 rounded-xl text-xs outline-none" style={{ background: '#FEF7F1', border: '1px solid rgba(252,211,217,0.6)' }}>
+              <option value="seller">Vendedor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <button onClick={() => void createInvitation()} disabled={inviteLoading || !inviteEmail.trim()} className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #E28B9B, #D66D81)' }}>
+            <Send size={13} /> {inviteLoading ? 'Gerando...' : 'Gerar convite'}
+          </button>
+          {inviteMessage && <div className="mt-3 text-xs" style={{ color: inviteLink ? '#D66D81' : '#C94B5F' }}>{inviteMessage}</div>}
+          {inviteLink && <div className="mt-2 flex gap-2 items-center"><input readOnly value={inviteLink} className="min-w-0 flex-1 px-3 py-2 rounded-lg text-xs" style={{ background: '#FEF7F1', color: '#6B6B6E' }} /><button onClick={() => void navigator.clipboard.writeText(inviteLink)} className="p-2 rounded-lg" title="Copiar link"><Copy size={14} style={{ color: '#D66D81' }} /></button><a href={`mailto:${inviteEmail}?subject=Convite Bromélia Terrários&body=Você foi convidado para acessar o sistema. Use este link: ${encodeURIComponent(inviteLink)}`} className="p-2 rounded-lg" title="Enviar por e-mail"><Send size={14} style={{ color: '#D66D81' }} /></a></div>}
         </div>
       </div>
     </div>

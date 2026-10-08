@@ -8,12 +8,14 @@ import SalesHistory from './components/SalesHistory';
 import Analytics from './components/Analytics';
 import SettingsView from './components/SettingsView';
 import WeeklyReport from './components/WeeklyReport';
+import InviteAcceptance from './components/InviteAcceptance';
 import { supabase } from './lib/supabase';
 
 type View = 'dashboard' | 'inventory' | 'sales' | 'sales-history' | 'analytics' | 'weekly-report' | 'settings';
 export type UserRole = 'admin' | 'seller';
 
 export default function App() {
+  const inviteToken = new URLSearchParams(window.location.search).get('invite');
   const [sessionReady, setSessionReady] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -21,6 +23,10 @@ export default function App() {
   const [activeView, setActiveView] = useState<View>('dashboard');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('bromelia-dark-mode') === 'true');
+
+  if (inviteToken) {
+    return <InviteAcceptance token={inviteToken} />;
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
