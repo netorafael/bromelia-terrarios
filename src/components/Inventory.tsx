@@ -2,9 +2,10 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Search, Plus, X, Camera, Image, ChevronDown, Check,
   Package, AlertTriangle,
-  Trash2,
+  Trash2, Pencil,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { productImage, productPlaceholder } from '../lib/productPlaceholder';
 
 type Tipo = 'terrario';
 type Status = 'Em Estoque' | 'Estoque Baixo' | 'Sem Estoque';
@@ -34,7 +35,7 @@ const statusOpcoes: Status[] = ['Em Estoque', 'Estoque Baixo', 'Sem Estoque'];
 function statusStyle(s: Status) {
   if (s === 'Em Estoque') return { background: '#F9E8EC', color: '#D66D81' };
   if (s === 'Estoque Baixo') return { background: '#FDE0E2', color: '#C94B5F' };
-  return { background: '#F0F0F0', color: '#888' };
+  return { background: '#E2E2E2', color: '#5A5A5A' };
 }
 
 function parseMoney(value: string) {
@@ -59,7 +60,8 @@ function formatMoneyInput(value: string) {
 
 interface NovoModalProps {
   onClose: () => void;
-  onSave: (item: Omit<Item, 'id'>) => void;
+  onSave: (item: Omit<Item, 'id'>) => boolean | Promise<boolean>;
+  item?: Item | null;
 }
 
 const VAZIO = {
@@ -92,7 +94,7 @@ function ProductField({ label, field, placeholder, type = 'text', form, errors, 
 
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: '#6B6B6E' }}>{label}</label>
+      <label className="block text-xs font-medium mb-1" style={{ color: '#454549' }}>{label}</label>
       <input
         type={isMoneyField ? 'text' : type}
         inputMode={field === 'custo' || field === 'preco' ? 'decimal' : undefined}
@@ -115,12 +117,33 @@ function ProductField({ label, field, placeholder, type = 'text', form, errors, 
   );
 }
 
-function NovoModal({ onClose, onSave }: NovoModalProps) {
+function NovoModal({ onClose, onSave, item = null }: NovoModalProps) {
   const [form, setForm] = useState({ ...VAZIO });
   const [imgPreview, setImgPreview] = useState('');
   const [erros, setErros] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!item) {
+      setForm({ ...VAZIO });
+      setImgPreview('');
+      return;
+    }
+    setForm({
+      tipo: item.tipo,
+      nome: item.nome,
+      categoria: item.categoria,
+      sku: item.sku,
+      quantidade: item.quantidade,
+      minimo: item.minimo,
+      custo: item.custo,
+      preco: item.preco,
+      status: item.status,
+      img: item.img,
+    });
+    setImgPreview(item.img);
+  }, [item]);
 
   const set = (k: keyof typeof form, v: any) => {
     setForm(prev => ({ ...prev, [k]: v }));
@@ -142,17 +165,17 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
     return e;
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     const e = validar();
     if (Object.keys(e).length) { setErros(e); return; }
-    onSave({
+    const saved = await onSave({
       ...form,
       quantidade: Number(form.quantidade),
       minimo: Number(form.minimo),
       categoriaId: null,
-      img: imgPreview || `https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=64&h=64&fit=crop&auto=format`,
+      img: imgPreview || productPlaceholder(form.nome, form.categoria),
     });
-    onClose();
+    if (saved) onClose();
   };
 
   return (
@@ -175,9 +198,9 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
         >
           <div>
             <div className="font-semibold" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
-              Novo Produto
+              {item ? 'Editar Produto' : 'Novo Produto'}
             </div>
-            <div className="text-xs mt-0.5" style={{ color: '#A0A0A3' }}>Preencha todas as informações</div>
+            <div className="text-xs mt-0.5" style={{ color: '#59595D' }}>{item ? 'Atualize as informações do produto' : 'Preencha todas as informações'}</div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#FDE0E2' }}>
             <X size={15} style={{ color: '#D66D81' }} />
@@ -187,7 +210,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
         <div className="px-6 py-5 space-y-5">
           {/* Foto */}
           <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Foto do Produto</label>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#454549' }}>Foto do Produto</label>
             <div className="flex gap-3">
               {/* Preview */}
               <div
@@ -196,7 +219,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
               >
                 {imgPreview
                   ? <img src={imgPreview} alt="preview" className="w-full h-full object-cover" />
-                  : <Image size={22} style={{ color: '#FCD3D9' }} />
+                  : <img src={productPlaceholder(form.nome || 'Novo produto', form.categoria)} alt="Prévia padrão do produto" className="w-full h-full object-cover" />
                 }
               </div>
               <div className="flex flex-col gap-2 flex-1">
@@ -228,7 +251,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
 
           {/* Tipo */}
           <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Tipo de Produto</label>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#454549' }}>Tipo de Produto</label>
             <div className="grid grid-cols-2 gap-2">
               {([['terrario', 'Terrário', Package]] as const).map(([val, label, Icon]) => (
                 <button
@@ -238,7 +261,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
                   style={{
                     background: form.tipo === val ? '#F9E8EC' : '#FEF7F1',
                     border: form.tipo === val ? '1.5px solid #D66D81' : '1px solid rgba(252,211,217,0.4)',
-                    color: form.tipo === val ? '#D66D81' : '#6B6B6E',
+                    color: form.tipo === val ? '#D66D81' : '#454549',
                   }}
                 >
                   <Icon size={15} />
@@ -253,7 +276,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
 
           {/* Categoria */}
           <div>
-            <label className="block text-xs font-medium mb-1" style={{ color: '#6B6B6E' }}>Categoria</label>
+            <label className="block text-xs font-medium mb-1" style={{ color: '#454549' }}>Categoria</label>
             <div className="relative">
               <select
                 value={form.categoria}
@@ -262,13 +285,13 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
                 style={{
                   background: '#FEF7F1',
                   border: erros.categoria ? '1.5px solid #C94B5F' : '1px solid rgba(252,211,217,0.5)',
-                  color: form.categoria ? '#1C1C1E' : '#A0A0A3',
+                  color: form.categoria ? '#1C1C1E' : '#59595D',
                 }}
               >
                 <option value="" disabled>Selecione uma categoria</option>
                 {categoriasPorTipo[form.tipo].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#A0A0A3' }} />
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#59595D' }} />
             </div>
             {erros.categoria && <p className="text-xs mt-1" style={{ color: '#C94B5F' }}>{erros.categoria}</p>}
           </div>
@@ -291,7 +314,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
 
           {/* Status */}
           <div>
-            <label className="block text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Status</label>
+            <label className="block text-xs font-medium mb-2" style={{ color: '#454549' }}>Status</label>
             <div className="flex gap-2 flex-wrap">
               {statusOpcoes.map(s => (
                 <button
@@ -329,7 +352,7 @@ function NovoModal({ onClose, onSave }: NovoModalProps) {
             className="flex-1 py-3 rounded-xl text-sm font-semibold"
             style={{ background: 'linear-gradient(135deg, #E28B9B, #D66D81)', color: 'white', boxShadow: '0 4px 16px rgba(214,109,129,0.3)' }}
           >
-            Salvar Produto
+            {item ? 'Salvar Alterações' : 'Salvar Produto'}
           </button>
         </div>
       </div>
@@ -363,7 +386,7 @@ function FiltrosPanel({
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold" style={{ color: '#1C1C1E' }}>Filtros</span>
         <div className="flex gap-2">
-          <button onClick={onLimpar} className="text-xs px-3 py-1.5 rounded-lg" style={{ color: '#A0A0A3', background: '#FEF7F1' }}>
+          <button onClick={onLimpar} className="text-xs px-3 py-1.5 rounded-lg" style={{ color: '#59595D', background: '#FEF7F1' }}>
             Limpar
           </button>
           <button onClick={onFechar} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FDE0E2' }}>
@@ -373,7 +396,7 @@ function FiltrosPanel({
       </div>
 
       <div>
-        <p className="text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Categoria</p>
+        <p className="text-xs font-medium mb-2" style={{ color: '#454549' }}>Categoria</p>
         <div className="flex flex-wrap gap-1.5">
           {['Todas', ...categorias].map(c => (
             <button
@@ -383,7 +406,7 @@ function FiltrosPanel({
               style={{
                 background: (c === 'Todas' ? filtroCategoria === '' : filtroCategoria === c) ? '#F9E8EC' : '#FEF7F1',
                 border: (c === 'Todas' ? filtroCategoria === '' : filtroCategoria === c) ? '1.5px solid #D66D81' : '1px solid rgba(252,211,217,0.4)',
-                color: (c === 'Todas' ? filtroCategoria === '' : filtroCategoria === c) ? '#D66D81' : '#6B6B6E',
+                color: (c === 'Todas' ? filtroCategoria === '' : filtroCategoria === c) ? '#D66D81' : '#454549',
               }}
             >
               {c}
@@ -393,7 +416,7 @@ function FiltrosPanel({
       </div>
 
       <div>
-        <p className="text-xs font-medium mb-2" style={{ color: '#6B6B6E' }}>Status</p>
+        <p className="text-xs font-medium mb-2" style={{ color: '#454549' }}>Status</p>
         <div className="flex flex-wrap gap-1.5">
           {(['Todos', ...statusOpcoes] as const).map(s => (
             <button
@@ -403,7 +426,7 @@ function FiltrosPanel({
               style={{
                 background: (s === 'Todos' ? filtroStatus === '' : filtroStatus === s) ? '#F9E8EC' : '#FEF7F1',
                 border: (s === 'Todos' ? filtroStatus === '' : filtroStatus === s) ? '1.5px solid #D66D81' : '1px solid rgba(252,211,217,0.4)',
-                color: (s === 'Todos' ? filtroStatus === '' : filtroStatus === s) ? '#D66D81' : '#6B6B6E',
+                color: (s === 'Todos' ? filtroStatus === '' : filtroStatus === s) ? '#D66D81' : '#454549',
               }}
             >
               {s}
@@ -426,6 +449,8 @@ export default function Estoque() {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [produtoEmEdicao, setProdutoEmEdicao] = useState<Item | null>(null);
+  const [produtoExpandido, setProdutoExpandido] = useState<string | null>(null);
 
   useEffect(() => {
     const carregar = async () => {
@@ -454,7 +479,7 @@ export default function Estoque() {
           custo: `R$ ${Number(product.cost_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           preco: product.sale_price == null ? '—' : `R$ ${Number(product.sale_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
           status: quantity === 0 ? 'Sem Estoque' : quantity <= minimum ? 'Estoque Baixo' : 'Em Estoque',
-          img: product.image_url ?? 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=64&h=64&fit=crop&auto=format',
+          img: productImage(product.image_url, product.name, product.categories?.name),
         };
       }).filter(Boolean) as Item[]);
     };
@@ -465,13 +490,13 @@ export default function Estoque() {
     const { data: membership } = await supabase.from('store_users').select('store_id').limit(1).single();
     if (!membership) {
       setLoadError('Usuário não está associado a uma loja.');
-      return;
+      return false;
     }
     const categorySlug = novo.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
     const { data: category } = await supabase.from('categories').select('id').eq('slug', categorySlug).eq('active', true).maybeSingle();
     if (!category) {
       setLoadError('Não foi possível localizar a categoria selecionada.');
-      return;
+      return false;
     }
     const generatedSku = `TER-${Date.now().toString(36).toUpperCase()}`;
     const { data, error } = await supabase.from('products').insert({
@@ -484,15 +509,64 @@ export default function Estoque() {
     }).select('id').single();
     if (error || !data) {
       setLoadError(error?.message ?? 'Não foi possível criar o produto.');
-      return;
+      return false;
     }
     const { error: inventoryError } = await supabase.from('inventory_levels').insert({ product_id: data.id, quantity: novo.quantidade, minimum_quantity: 0 });
     if (inventoryError) {
       setLoadError(inventoryError.message);
-      return;
+      return false;
     }
     setItens(prev => [...prev, { ...novo, id: data.id, sku: generatedSku, categoriaId: category.id, minimo: 0 }]);
+    return true;
   }, [tab]);
+
+  const editarItem = useCallback(async (novo: Omit<Item, 'id'>) => {
+    if (!produtoEmEdicao) return false;
+    const categorySlug = novo.categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('slug', categorySlug)
+      .eq('active', true)
+      .maybeSingle();
+    if (categoryError || !category) {
+      setLoadError(categoryError?.message ?? 'Não foi possível localizar a categoria selecionada.');
+      return false;
+    }
+
+    const { error } = await supabase.from('products').update({
+      category_id: category.id,
+      name: novo.nome,
+      cost_price: parseMoney(novo.custo),
+      sale_price: novo.preco === '—' || !novo.preco.trim() ? null : parseMoney(novo.preco),
+      image_url: novo.img || null,
+    }).eq('id', produtoEmEdicao.id);
+    if (error) {
+      setLoadError(error.message);
+      return false;
+    }
+
+    const { error: inventoryError } = await supabase.rpc('set_inventory_quantity', {
+      p_product_id: produtoEmEdicao.id,
+      p_quantity: Math.max(0, Math.floor(Number(novo.quantidade) || 0)),
+    });
+    if (inventoryError) {
+      setLoadError(inventoryError.message);
+      return false;
+    }
+
+    const quantidade = Math.max(0, Math.floor(Number(novo.quantidade) || 0));
+    setItens(prev => prev.map(item => item.id === produtoEmEdicao.id ? {
+      ...novo,
+      id: item.id,
+      sku: item.sku,
+      categoriaId: category.id,
+      quantidade,
+      minimo: item.minimo,
+      status: quantidade === 0 ? 'Sem Estoque' : quantidade <= item.minimo ? 'Estoque Baixo' : 'Em Estoque',
+    } : item));
+    return true;
+  }, [produtoEmEdicao]);
 
   const atualizarCategoria = async (item: Item, categoria: string) => {
     const slug = categoria.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
@@ -558,6 +632,7 @@ export default function Estoque() {
   });
 
   const filtrosAtivos = [filtroCategoria, filtroStatus].filter(Boolean).length;
+  const inventoryValue = itens.reduce((total, item) => total + parseMoney(item.custo) * item.quantidade, 0);
 
   return (
     <div className="space-y-5">
@@ -568,7 +643,7 @@ export default function Estoque() {
           <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
             Estoque
           </h1>
-          <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>
+          <p className="text-sm mt-1" style={{ color: '#59595D' }}>
             Gestão de produtos
           </p>
         </div>
@@ -583,6 +658,26 @@ export default function Estoque() {
         </button>
       </div>
 
+      <div
+        className="rounded-2xl p-5 flex items-start justify-between"
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid rgba(252, 211, 217, 0.4)',
+          boxShadow: '0 1px 8px rgba(214, 109, 129, 0.06)',
+        }}
+      >
+        <div>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center mb-5" style={{ background: '#FDE0E2' }}>
+            <Package size={18} style={{ color: '#D66D81' }} />
+          </div>
+          <div className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
+            {inventoryValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </div>
+          <div className="text-sm mt-1" style={{ color: '#59595D' }}>Valor em Estoque</div>
+        </div>
+        <span className="px-3 py-1 rounded-full text-xs font-medium" style={{ background: '#F9E8EC', color: '#D66D81' }}>Atual</span>
+      </div>
+
       {/* Abas */}
       <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: '#FDE0E2' }}>
         {([['terrario', 'Terrários Prontos', Package]] as const).map(([id, label, Icon]) => (
@@ -592,7 +687,7 @@ export default function Estoque() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150"
             style={{
               background: tab === id ? 'white' : 'transparent',
-              color: tab === id ? '#D66D81' : '#A0A0A3',
+              color: tab === id ? '#D66D81' : '#59595D',
               boxShadow: tab === id ? '0 1px 4px rgba(214,109,129,0.15)' : 'none',
             }}
           >
@@ -607,7 +702,7 @@ export default function Estoque() {
       <div className="space-y-3">
         <div className="flex gap-3">
           <div className="flex-1 relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#A0A0A3' }} />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#59595D' }} />
             <input
               type="text"
               placeholder="Buscar por nome..."
@@ -629,7 +724,7 @@ export default function Estoque() {
             style={{
               background: mostrarFiltros || filtrosAtivos > 0 ? '#F9E8EC' : 'white',
               border: mostrarFiltros || filtrosAtivos > 0 ? '1.5px solid #D66D81' : '1px solid rgba(252,211,217,0.5)',
-              color: mostrarFiltros || filtrosAtivos > 0 ? '#D66D81' : '#6B6B6E',
+              color: mostrarFiltros || filtrosAtivos > 0 ? '#D66D81' : '#454549',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -661,7 +756,7 @@ export default function Estoque() {
 
       {/* Contagem */}
       <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: '#A0A0A3' }}>
+        <span className="text-xs" style={{ color: '#59595D' }}>
           {filtrados.length} {filtrados.length === 1 ? 'item' : 'itens'} encontrado{filtrados.length === 1 ? '' : 's'}
         </span>
         {(busca || filtroCategoria || filtroStatus) && (
@@ -684,99 +779,66 @@ export default function Estoque() {
           boxShadow: '0 1px 8px rgba(214,109,129,0.06)',
         }}
       >
-        <div className="overflow-x-auto">
+        <div className="hidden md:block">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(252,211,217,0.3)', background: '#FEF7F1' }}>
                 {['Produto', 'Categoria', 'Qtd.', 'Custo', 'Preço de Venda', 'Status', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap" style={{ color: '#A0A0A3' }}>
-                    {h}
-                  </th>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium whitespace-nowrap" style={{ color: '#59595D' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtrados.map(item => (
-                <tr
-                  key={item.id}
-                  className="transition-colors hover:bg-pink-50 cursor-pointer"
-                  style={{ borderBottom: '1px solid rgba(252,211,217,0.2)' }}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={item.img}
-                        alt={item.nome}
-                        className="w-9 h-9 rounded-xl object-cover flex-shrink-0"
-                        style={{ background: '#FDE0E2' }}
-                      />
-                      <span className="font-medium whitespace-nowrap" style={{ color: '#1C1C1E' }}>{item.nome}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <select
-                      value={item.categoria}
-                      onChange={event => void atualizarCategoria(item, event.target.value)}
-                      className="bg-transparent text-sm outline-none cursor-pointer"
-                      style={{ color: '#6B6B6E' }}
-                      aria-label={`Categoria de ${item.nome}`}
-                    >
-                      {categoriasTerrario.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={item.quantidade}
-                      onChange={event => {
-                        const quantidade = Number(event.target.value);
-                        if (!Number.isFinite(quantidade) || quantidade < 0) return;
-                        setItens(prev => prev.map(entry => entry.id === item.id
-                          ? { ...entry, quantidade: Math.floor(quantidade) }
-                          : entry));
-                      }}
-                      onBlur={event => void atualizarQuantidade(item.id, Number(event.target.value))}
-                      className="w-20 rounded-lg px-2 py-1 text-sm font-semibold outline-none"
-                      style={{
-                        color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E',
-                        border: '1px solid rgba(252,211,217,0.6)',
-                        background: '#FFF9F6',
-                      }}
-                      aria-label={`Quantidade em estoque de ${item.nome}`}
-                    />
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#6B6B6E' }}>{item.custo}</td>
+                <tr key={item.id} className="transition-colors hover:bg-pink-50 cursor-pointer" style={{ borderBottom: '1px solid rgba(252,211,217,0.2)' }}>
+                  <td className="px-4 py-3"><div className="flex items-center gap-3"><img src={item.img} alt={item.nome} className="w-9 h-9 rounded-xl object-cover flex-shrink-0" style={{ background: '#FDE0E2' }} /><span className="font-medium whitespace-nowrap" style={{ color: '#1C1C1E' }}>{item.nome}</span></div></td>
+                  <td className="px-4 py-3 whitespace-nowrap"><select value={item.categoria} onChange={event => void atualizarCategoria(item, event.target.value)} className="bg-transparent text-sm outline-none cursor-pointer" style={{ color: '#454549' }} aria-label={`Categoria de ${item.nome}`}>{categoriasTerrario.map(categoria => <option key={categoria} value={categoria}>{categoria}</option>)}</select></td>
+                  <td className="px-4 py-3 whitespace-nowrap"><input type="number" min="0" step="1" value={item.quantidade} onChange={event => { const quantidade = Number(event.target.value); if (!Number.isFinite(quantidade) || quantidade < 0) return; setItens(prev => prev.map(entry => entry.id === item.id ? { ...entry, quantidade: Math.floor(quantidade) } : entry)); }} onBlur={event => void atualizarQuantidade(item.id, Number(event.target.value))} className="w-20 rounded-lg px-2 py-1 text-sm font-semibold outline-none" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E', border: '1px solid rgba(252,211,217,0.6)', background: '#FFF9F6' }} aria-label={`Quantidade em estoque de ${item.nome}`} /></td>
+                  <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#454549' }}>{item.custo}</td>
                   <td className="px-4 py-3 font-medium whitespace-nowrap" style={{ color: '#1C1C1E' }}>{item.preco}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap"
-                      style={statusStyle(item.status)}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void removerProduto(item)}
-                      className="p-2 rounded-lg transition-colors hover:bg-pink-50"
-                      title="Excluir produto"
-                      aria-label={`Excluir ${item.nome}`}
-                    >
-                      <Trash2 size={15} style={{ color: '#C94B5F' }} />
-                    </button>
-                  </td>
+                  <td className="px-4 py-3"><span className="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap" style={statusStyle(item.status)}>{item.status}</span></td>
+                  <td className="px-4 py-3 text-right"><button type="button" onClick={() => { setProdutoEmEdicao(item); setMostrarModal(true); }} className="p-2 rounded-lg transition-colors hover:bg-pink-50" title="Editar produto" aria-label={`Editar ${item.nome}`}><Pencil size={15} style={{ color: '#D66D81' }} /></button><button type="button" onClick={() => void removerProduto(item)} className="p-2 rounded-lg transition-colors hover:bg-pink-50" title="Excluir produto" aria-label={`Excluir ${item.nome}`}><Trash2 size={15} style={{ color: '#C94B5F' }} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        </div>
+        <div className="md:hidden divide-y" style={{ borderColor: 'rgba(252,211,217,0.3)' }}>
+        {filtrados.map(item => {
+          const aberto = produtoExpandido === item.id;
+          return (
+            <div key={item.id}>
+              <button type="button" onClick={() => setProdutoExpandido(aberto ? null : item.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left" aria-expanded={aberto}>
+                <img src={item.img} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" style={{ background: '#FDE0E2' }} />
+                <span className="flex-1 min-w-0 font-medium truncate" style={{ color: '#1C1C1E' }}>{item.nome}</span>
+                <ChevronDown size={16} className={`transition-transform ${aberto ? 'rotate-180' : ''}`} style={{ color: '#D66D81' }} />
+              </button>
+              {aberto && (
+                <div className="px-4 pb-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><div className="text-xs mb-1" style={{ color: '#59595D' }}>Categoria</div><div style={{ color: '#454549' }}>{item.categoria}</div></div>
+                    <div><div className="text-xs mb-1" style={{ color: '#59595D' }}>Quantidade</div><div className="font-semibold" style={{ color: item.quantidade <= item.minimo ? '#C94B5F' : '#1C1C1E' }}>{item.quantidade}</div></div>
+                    <div><div className="text-xs mb-1" style={{ color: '#59595D' }}>Custo</div><div style={{ color: '#454549' }}>{item.custo}</div></div>
+                    <div><div className="text-xs mb-1" style={{ color: '#59595D' }}>Preço de venda</div><div className="font-medium" style={{ color: '#1C1C1E' }}>{item.preco}</div></div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium" style={statusStyle(item.status)}>{item.status}</span>
+                    <div className="flex items-center">
+                      <button type="button" onClick={() => { setProdutoEmEdicao(item); setMostrarModal(true); }} className="p-2 rounded-lg hover:bg-pink-50" title="Editar produto" aria-label={`Editar ${item.nome}`}><Pencil size={15} style={{ color: '#D66D81' }} /></button>
+                      <button type="button" onClick={() => void removerProduto(item)} className="p-2 rounded-lg hover:bg-pink-50" title="Excluir produto" aria-label={`Excluir ${item.nome}`}><Trash2 size={15} style={{ color: '#C94B5F' }} /></button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {filtrados.length === 0 && (
           <div className="py-16 text-center space-y-2">
             <div className="text-2xl">🌿</div>
-            <div className="text-sm" style={{ color: '#A0A0A3' }}>Nenhum item encontrado.</div>
+            <div className="text-sm" style={{ color: '#59595D' }}>Nenhum item encontrado.</div>
             {(busca || filtroCategoria || filtroStatus) && (
               <button onClick={() => { setBusca(''); setFiltroCategoria(''); setFiltroStatus(''); }}
                 className="text-xs font-medium" style={{ color: '#D66D81' }}>
@@ -786,10 +848,15 @@ export default function Estoque() {
           </div>
         )}
       </div>
+      </div>
 
       {/* Modal */}
       {mostrarModal && (
-        <NovoModal onClose={() => setMostrarModal(false)} onSave={adicionarItem} />
+        <NovoModal
+          item={produtoEmEdicao}
+          onClose={() => { setMostrarModal(false); setProdutoEmEdicao(null); }}
+          onSave={produtoEmEdicao ? editarItem : adicionarItem}
+        />
       )}
     </div>
   );

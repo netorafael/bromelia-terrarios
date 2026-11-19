@@ -3,7 +3,8 @@ import {
   TrendingDown,
   Package,
   DollarSign,
-  ArrowUpRight,
+  ShoppingCart,
+  Wrench,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -15,6 +16,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from 'recharts';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -49,7 +52,7 @@ function MetricCard({
           onClick?.();
         }
       }}
-      className="rounded-2xl p-5 flex flex-col gap-4"
+      className={`rounded-2xl p-5 flex flex-col gap-4 ${accent ? 'liquid-accent' : ''} ${isInteractive ? 'liquid-interactive' : ''}`}
       style={{
         background: accent ? 'linear-gradient(135deg, #E28B9B, #D66D81)' : '#FFFFFF',
         border: accent ? 'none' : '1px solid rgba(252, 211, 217, 0.4)',
@@ -84,7 +87,7 @@ function MetricCard({
         >
           {value}
         </div>
-        <div className="text-xs mt-1" style={{ color: accent ? 'rgba(255,255,255,0.75)' : '#A0A0A3' }}>
+        <div className="text-xs mt-1" style={{ color: accent ? 'rgba(255,255,255,0.75)' : '#59595D' }}>
           {label}
         </div>
       </div>
@@ -114,19 +117,24 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 interface DashboardProps {
   onViewReport: () => void;
+  onViewSales: () => void;
+  onViewInventory: () => void;
+  onViewMaintenance: () => void;
 }
 
-export default function Dashboard({ onViewReport }: DashboardProps) {
+export default function Dashboard({ onViewReport, onViewSales, onViewInventory, onViewMaintenance }: DashboardProps) {
   const [salesTrend, setSalesTrend] = useState<{ mes: string; receita: number }[]>([]);
+  const [profitTrend, setProfitTrend] = useState<{ mes: string; investimento: number; lucro: number }[]>([]);
   const [categoryData, setCategoryData] = useState<{ name: string; value: number; color: string }[]>([]);
   const [vendasRecentes, setVendasRecentes] = useState<{ id: string; item: string; qty: number; total: string; status: string }[]>([]);
-  const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, inventoryValue: 0, availableStock: 0 });
+  const [metrics, setMetrics] = useState({ revenue: 0, orders: 0, inventoryValue: 0, availableStock: 0, activeMaintenance: 0 });
 
   useEffect(() => {
     const loadDashboard = async () => {
-      const [{ data: sales }, { data: products }] = await Promise.all([
-        supabase.from('sales').select('id, sale_number, total, status, created_at, sale_items(product_name_snapshot, quantity, products(categories(name)))').order('created_at', { ascending: false }).limit(100),
+      const [{ data: sales }, { data: products }, { data: maintenance }] = await Promise.all([
+        supabase.from('sales').select('id, sale_number, total, status, created_at, sale_items(product_name_snapshot, quantity, unit_price, unit_cost_snapshot, products(categories(name)))').order('created_at', { ascending: false }).limit(100),
         supabase.from('products').select('cost_price, inventory_levels(quantity, minimum_quantity)').eq('active', true),
+        supabase.from('maintenance_orders').select('status').neq('status', 'delivered'),
       ]);
       const paidSales = (sales ?? []).filter((sale: any) => sale.status === 'paid');
       const today = new Date();
@@ -137,12 +145,36 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
           && saleDate.getDate() === today.getDate();
       });
       const revenueToday = salesToday.reduce((sum: number, sale: any) => sum + Number(sale.total), 0);
-      const trend = new Map<string, number>();
-      paidSales.forEach((sale: any) => {
-        const month = new Date(sale.created_at).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
-        trend.set(month, (trend.get(month) ?? 0) + Number(sale.total));
+      const now = new Date();
+      const months = Array.from({ length: 6 }, (_, index) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const mes = date.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+        return { key, mes };
       });
-      setSalesTrend(Array.from(trend, ([mes, receita]) => ({ mes, receita })).slice(-6));
+      const salesMap = new Map(months.map(({ key }) => [key, 0]));
+      const profitMap = new Map(months.map(({ key }) => [key, { investimento: 0, lucro: 0 }]));
+      paidSales.forEach((sale: any) => {
+        const date = new Date(sale.created_at);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (salesMap.has(key)) salesMap.set(key, (salesMap.get(key) ?? 0) + Number(sale.total));
+        if (profitMap.has(key)) {
+          const totals = profitMap.get(key)!;
+          (sale.sale_items ?? []).forEach((item: any) => {
+            const quantity = Number(item.quantity) || 0;
+            const investment = Number(item.unit_cost_snapshot) * quantity;
+            const profit = (Number(item.unit_price) - Number(item.unit_cost_snapshot)) * quantity;
+            totals.investimento += investment;
+            totals.lucro += profit;
+          });
+        }
+      });
+      setSalesTrend(months.map(({ key, mes }) => ({ mes, receita: salesMap.get(key) ?? 0 })));
+      setProfitTrend(months.map(({ key, mes }) => ({
+        mes,
+        investimento: profitMap.get(key)?.investimento ?? 0,
+        lucro: profitMap.get(key)?.lucro ?? 0,
+      })));
       const categoryTotals = new Map<string, number>();
       paidSales.forEach((sale: any) => (sale.sale_items ?? []).forEach((item: any) => {
         const name = item.products?.categories?.name ?? 'Sem categoria';
@@ -168,7 +200,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
         const inventory = Array.isArray(product.inventory_levels) ? product.inventory_levels[0] : product.inventory_levels;
         return sum + Number(inventory?.quantity ?? 0);
       }, 0);
-      setMetrics({ revenue: revenueToday, orders: salesToday.length, inventoryValue, availableStock });
+      setMetrics({ revenue: revenueToday, orders: salesToday.length, inventoryValue, availableStock, activeMaintenance: maintenance?.length ?? 0 });
     };
     void loadDashboard();
   }, []);
@@ -183,35 +215,26 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
           >
             Visão Geral
           </h1>
-          <p className="text-sm mt-1" style={{ color: '#A0A0A3' }}>
+          <p className="text-sm mt-1" style={{ color: '#59595D' }}>
             Dados reais da sua loja
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onViewReport}
-          className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-all hover:opacity-80 active:scale-95"
-          style={{ background: '#FDE0E2', color: '#D66D81' }}
-        >
-          <ArrowUpRight size={14} />
-          <span className="hidden sm:inline">Ver Relatório</span>
-          <span className="sm:hidden">Relatório</span>
-        </button>
       </div>
 
       {/* Cards de Métricas */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard label="Receita do dia" value={`R$ ${metrics.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Ver detalhes" positive icon={DollarSign} accent onClick={onViewReport} />
-        <MetricCard label="Vendas realizadas hoje" value={`${metrics.orders}`} change="Hoje" positive icon={Package} />
-        <MetricCard label="Valor em Estoque" value={`R$ ${metrics.inventoryValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} change="Atual" positive icon={TrendingUp} />
-        <MetricCard label="Estoque disponível" value={`${metrics.availableStock} itens`} change="Atual" positive icon={Package} />
+        <MetricCard label="Vendas realizadas hoje" value={`${metrics.orders}`} change="Ver vendas" positive icon={ShoppingCart} onClick={onViewSales} />
+        <MetricCard label="Estoque disponível" value={`${metrics.availableStock} itens`} change="Ver estoque" positive icon={Package} onClick={onViewInventory} />
+        <MetricCard label="Manutenções ativas" value={`${metrics.activeMaintenance}`} change="Ver manutenção" positive icon={Wrench} onClick={onViewMaintenance} />
       </div>
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 space-y-4">
         {/* Gráfico de Área */}
         <div
-          className="lg:col-span-2 rounded-2xl p-5"
+          className="rounded-2xl p-5"
           style={{
             background: '#FFFFFF',
             border: '1px solid rgba(252, 211, 217, 0.4)',
@@ -220,9 +243,9 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
         >
           <div className="mb-5">
             <div className="font-semibold text-sm" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
-              Tendência de Vendas
+              Vendas
             </div>
-            <div className="text-xs mt-0.5" style={{ color: '#A0A0A3' }}>Últimos 6 meses</div>
+            <div className="text-xs mt-0.5" style={{ color: '#59595D' }}>Últimos 6 meses</div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={salesTrend} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
@@ -232,8 +255,8 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
                   <stop offset="100%" stopColor="#FDE0E2" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#A0A0A3' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#A0A0A3' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
               <Tooltip content={<CustomTooltip />} />
               <Area
                 type="monotone"
@@ -248,6 +271,35 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
           </ResponsiveContainer>
         </div>
 
+        {/* Lucro estimado */}
+        <div
+          className="rounded-2xl p-5"
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid rgba(252, 211, 217, 0.4)',
+            boxShadow: '0 1px 8px rgba(214, 109, 129, 0.06)',
+          }}
+        >
+          <div className="mb-5">
+            <div className="font-semibold text-sm" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>Lucro estimado</div>
+            <div className="text-xs mt-0.5" style={{ color: '#59595D' }}>Últimos 6 meses</div>
+          </div>
+          <div className="flex items-center gap-4 mb-3 text-xs">
+            <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: '#8FA9A0' }} /><span style={{ color: '#59595D' }}>Investimento</span></div>
+            <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: '#D66D81' }} /><span style={{ color: '#59595D' }}>Lucro</span></div>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={profitTrend} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="investimento" name="Investimento" stroke="#8FA9A0" strokeWidth={2} dot={{ fill: '#8FA9A0', r: 3, strokeWidth: 0 }} />
+              <Line type="monotone" dataKey="lucro" name="Lucro" stroke="#D66D81" strokeWidth={2} dot={{ fill: '#D66D81', r: 3, strokeWidth: 0 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        </div>
+
         {/* Gráfico Donut */}
         <div
           className="rounded-2xl p-5"
@@ -260,7 +312,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
           <div className="font-semibold text-sm mb-1" style={{ fontFamily: 'var(--font-display)', color: '#1C1C1E' }}>
             Categorias
           </div>
-          <div className="text-xs mb-3" style={{ color: '#A0A0A3' }}>Top vendas por tipo</div>
+          <div className="text-xs mb-3" style={{ color: '#59595D' }}>Top vendas por tipo</div>
           <div className="flex justify-center">
             <PieChart width={150} height={150}>
               <Pie
@@ -279,7 +331,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
             {categoryData.map((cat) => (
               <div key={cat.name} className="flex items-center gap-2 text-xs">
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
-                <span className="flex-1 truncate" style={{ color: '#6B6B6E' }}>{cat.name}</span>
+                <span className="flex-1 truncate" style={{ color: '#454549' }}>{cat.name}</span>
                 <span className="font-medium" style={{ color: '#1C1C1E' }}>{cat.value}%</span>
               </div>
             ))}
@@ -306,7 +358,7 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(252, 211, 217, 0.3)' }}>
                 {['Pedido', 'Produto', 'Qtd', 'Total', 'Status'].map(h => (
-                  <th key={h} className="px-5 py-3 text-left text-xs font-medium" style={{ color: '#A0A0A3' }}>
+                  <th key={h} className="px-5 py-3 text-left text-xs font-medium" style={{ color: '#59595D' }}>
                     {h}
                   </th>
                 ))}
@@ -319,9 +371,9 @@ export default function Dashboard({ onViewReport }: DashboardProps) {
                   className="transition-colors hover:bg-pink-50"
                   style={{ borderBottom: '1px solid rgba(252, 211, 217, 0.2)' }}
                 >
-                  <td className="px-5 py-3 text-xs font-mono" style={{ color: '#A0A0A3' }}>{venda.id}</td>
+                  <td className="px-5 py-3 text-xs font-mono" style={{ color: '#59595D' }}>{venda.id}</td>
                   <td className="px-5 py-3 font-medium" style={{ color: '#1C1C1E' }}>{venda.item}</td>
-                  <td className="px-5 py-3" style={{ color: '#6B6B6E' }}>{venda.qty}</td>
+                  <td className="px-5 py-3" style={{ color: '#454549' }}>{venda.qty}</td>
                   <td className="px-5 py-3 font-medium" style={{ color: '#1C1C1E' }}>{venda.total}</td>
                   <td className="px-5 py-3">
                     <span
