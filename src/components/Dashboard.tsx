@@ -9,6 +9,8 @@ import {
 import {
   AreaChart,
   Area,
+  Bar,
+  BarChart,
   XAxis,
   YAxis,
   Tooltip,
@@ -16,8 +18,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from 'recharts';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -97,6 +97,11 @@ function MetricCard({
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
+    const names: Record<string, string> = {
+      receita: 'Receita',
+      investimento: 'Investimento',
+      lucro: 'Lucro',
+    };
     return (
       <div
         className="px-3 py-2 rounded-xl text-xs"
@@ -107,8 +112,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           color: '#1C1C1E',
         }}
       >
-        <div className="font-medium">{label}</div>
-        <div style={{ color: '#D66D81' }}>R$ {payload[0].value.toLocaleString('pt-BR')}</div>
+        <div className="font-medium mb-1">{label}</div>
+        {payload.map((entry: any) => (
+          <div key={entry.dataKey} style={{ color: entry.color ?? '#D66D81' }}>
+            {names[entry.dataKey] ?? entry.name}: R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+        ))}
       </div>
     );
   }
@@ -289,13 +298,13 @@ export default function Dashboard({ onViewReport, onViewSales, onViewInventory, 
             <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: '#D66D81' }} /><span style={{ color: '#59595D' }}>Lucro</span></div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={profitTrend} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+            <BarChart data={profitTrend} barSize={18} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
               <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#59595D' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
               <Tooltip content={<CustomTooltip />} />
-              <Line type="monotone" dataKey="investimento" name="Investimento" stroke="#8FA9A0" strokeWidth={2} dot={{ fill: '#8FA9A0', r: 3, strokeWidth: 0 }} />
-              <Line type="monotone" dataKey="lucro" name="Lucro" stroke="#D66D81" strokeWidth={2} dot={{ fill: '#D66D81', r: 3, strokeWidth: 0 }} />
-            </LineChart>
+              <Bar dataKey="investimento" name="Investimento" fill="#8FA9A0" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="lucro" name="Lucro" fill="#D66D81" radius={[6, 6, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
         </div>

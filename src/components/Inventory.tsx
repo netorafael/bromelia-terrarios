@@ -805,11 +805,11 @@ export default function Estoque() {
           </table>
         </div>
         </div>
-        <div className="md:hidden divide-y" style={{ borderColor: 'rgba(252,211,217,0.3)' }}>
-        {filtrados.map(item => {
+        <div className="md:hidden">
+        {filtrados.map((item, index) => {
           const aberto = produtoExpandido === item.id;
           return (
-            <div key={item.id}>
+            <div key={item.id} style={{ borderTop: index === 0 ? 'none' : '1px solid #C94B5F' }}>
               <button type="button" onClick={() => setProdutoExpandido(aberto ? null : item.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left" aria-expanded={aberto}>
                 <img src={item.img} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" style={{ background: '#FDE0E2' }} />
                 <span className="flex-1 min-w-0 font-medium truncate" style={{ color: '#1C1C1E' }}>{item.nome}</span>
